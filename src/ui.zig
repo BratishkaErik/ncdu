@@ -6,7 +6,9 @@
 const std = @import("std");
 const main = @import("main.zig");
 const util = @import("util.zig");
-const c = @import("c.zig").c;
+const c = @import("c");
+
+const bufPrintZ = util.bufPrintZ;
 
 pub var inited: bool = false;
 pub var main_thread: std.Thread.Id = undefined;
@@ -26,7 +28,12 @@ pub fn quit() noreturn {
     std.process.exit(0);
 }
 
-const sleep = if (@hasDecl(std.time, "sleep")) std.time.sleep else std.Thread.sleep;
+fn sleep(nanoseconds: u64) void {
+    const duration = std.Io.Duration.fromNanoseconds(nanoseconds);
+    const clock = std.Io.Clock.awake;
+
+    main.io.sleep(duration, clock) catch {};
+}
 
 // Should be called when malloc fails. Will show a message to the user, wait
 // for a second and return to give it another try.
@@ -113,7 +120,7 @@ pub fn toUtf8(in: [:0]const u8) [:0]const u8 {
                 } else |_| {}
             }
         } else |_| {}
-        to_utf8_buf.writer(main.allocator).print("\\x{X:0>2}", .{in[i]}) catch unreachable;
+        to_utf8_buf.print(main.allocator, "\\x{X:0>2}", .{in[i]}) catch unreachable;
         i += 1;
     }
     return util.arrayListBufZ(&to_utf8_buf, main.allocator);
@@ -280,21 +287,13 @@ const styles = [_]StyleDef{
 };
 
 pub const Style = lbl: {
-    var fields: [styles.len]std.builtin.Type.EnumField = undefined;
-    for (&fields, styles, 0..) |*field, s, i| {
-        field.* = .{
-            .name = s.name,
-            .value = i,
-        };
+    var names: [styles.len][]const u8 = undefined;
+    var values: [styles.len]u8 = undefined;
+    for (styles, 0..) |s, i| {
+        names[i] = s.name;
+        values[i] = i;
     }
-    break :lbl @Type(.{
-        .@"enum" = .{
-            .tag_type = u8,
-            .fields = &fields,
-            .decls = &[_]std.builtin.Type.Declaration{},
-            .is_exhaustive = true,
-        }
-    });
+    break :lbl @Enum(u8, .exhaustive, &names, &values);
 };
 
 const ui = @This();
@@ -392,7 +391,7 @@ pub fn addstr(s: [:0]const u8) void {
 // Not to be used for strings that may end up >256 bytes.
 pub fn addprint(comptime fmt: []const u8, args: anytype) void {
     var buf: [256:0]u8 = undefined;
-    const s = std.fmt.bufPrintZ(&buf, fmt, args) catch unreachable;
+    const s = bufPrintZ(&buf, fmt, args) catch unreachable;
     addstr(s);
 }
 
@@ -643,16 +642,12 @@ pub fn getch(block: bool) i32 {
 }
 
 fn waitInput() void {
-    if (@hasDecl(std.io, "getStdIn")) {
-        std.io.getStdIn().reader().skipUntilDelimiterOrEof('\n') catch unreachable;
-    } else {
-        var buf: [512]u8 = undefined;
-        var rd = std.fs.File.stdin().reader(&buf);
-        _ = rd.interface.discardDelimiterExclusive('\n') catch unreachable;
-    }
+    var buf: [512]u8 = undefined;
+    var rd = std.Io.File.stdin().reader(main.io, &buf);
+    _ = rd.interface.discardDelimiterExclusive('\n') catch unreachable;
 }
 
-pub fn runCmd(cmd: []const []const u8, cwd: ?[]const u8, env: *std.process.EnvMap, reporterr: bool) void {
+pub fn runCmd(cmd: []const []const u8, cwd: ?[]const u8, env: *std.process.Environ.Map, reporterr: bool) void {
     deinit();
     defer init();
 
@@ -666,24 +661,35 @@ pub fn runCmd(cmd: []const []const u8, cwd: ?[]const u8, env: *std.process.EnvMa
     else
         env.put("NCDU_LEVEL", "1") catch unreachable;
 
-    var child = std.process.Child.init(cmd, main.allocator);
-    child.cwd = cwd;
-    child.env_map = env;
+    const term = (term: {
+        var child = std.process.spawn(main.io, .{
+            .argv = cmd,
+            .cwd = if (cwd) |path|
+                std.process.Child.Cwd{ .path = path }
+            else
+                std.process.Child.Cwd.inherit,
+            .environ_map = env,
+        }) catch |err| break :term err;
 
-    const term = child.spawnAndWait() catch |e| blk: {
+        const term = child.wait(main.io) catch |err| break :term err;
+        break :term term;
+    }) catch |e| blk: {
         std.debug.print("Error running command: {s}\n\nPress enter to continue.\n", .{ ui.errorString(e) });
         waitInput();
-        break :blk std.process.Child.Term{ .Exited = 0 };
+        break :blk std.process.Child.Term{ .exited = 0 };
     };
 
     const n = switch (term) {
-        .Exited  => "error",
-        .Signal  => "signal",
-        .Stopped => "stopped",
-        .Unknown => "unknown",
+        .exited  => "error",
+        .signal  => "signal",
+        .stopped => "stopped",
+        .unknown => "unknown",
     };
-    const v = switch (term) { inline else => |v| v };
-    if (term != .Exited or (reporterr and v != 0)) {
+    const v = switch (term) {
+        inline .exited, .unknown => |v| v,
+        inline else => |e| @intFromEnum(e),
+    };
+    if (term != .exited or (reporterr and v != 0)) {
         std.debug.print("\nCommand returned with {s} code {}.\nPress enter to continue.\n", .{ n, v });
         waitInput();
     }

@@ -3,6 +3,10 @@
 
 const std = @import("std");
 
+const Translator = @import("translate_c").Translator;
+
+const manifest = @import("build.zig.zon");
+
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
@@ -10,13 +14,28 @@ pub fn build(b: *std.Build) void {
     const pie = b.option(bool, "pie", "Build with PIE support (by default: target-dependant)");
     const strip = b.option(bool, "strip", "Strip debugging info (by default false)") orelse false;
 
+    const translate_c = b.dependency("translate_c", .{});
+    const t: Translator = .init(translate_c, .{
+        .c_source_file = b.path("src/c.h"),
+        .target = target,
+        .optimize = optimize,
+    });
+
     const main_mod = b.createModule(.{
         .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
         .strip = strip,
         .link_libc = true,
+        .imports = &.{
+            .{ .name = "c", .module = t.mod },
+        },
     });
+
+    const build_options = b.addOptions();
+    build_options.addOption([:0]const u8, "version", manifest.version);
+    main_mod.addOptions("build_options", build_options);
+
     main_mod.linkSystemLibrary("ncursesw", .{});
     main_mod.linkSystemLibrary("zstd", .{});
 

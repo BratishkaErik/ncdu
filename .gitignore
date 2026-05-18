@@ -8,4 +8,5 @@ zstd
 static-*/
 zig-cache/
 zig-out/
+zig-pkg/
 .zig-cache/

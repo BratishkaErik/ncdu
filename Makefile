@@ -11,7 +11,7 @@ BINDIR ?= ${PREFIX}/bin
 MANDIR ?= ${PREFIX}/share/man/man1
 ZIG_FLAGS ?= --release=fast -Dstrip
 
-NCDU_VERSION=$(shell grep 'program_version = "' src/main.zig | sed -e 's/^.*"\(.\+\)".*$$/\1/')
+NCDU_VERSION=$(shell grep '\.version' build.zig.zon | cut -d'"' -f2)
 
 .PHONY: build test
 build: release
@@ -23,7 +23,7 @@ debug:
 	$(ZIG) build
 
 clean:
-	rm -rf zig-cache zig-out
+	rm -rf .zig-cache zig-pkg zig-out
 
 install: install-bin install-doc
 
@@ -52,6 +52,8 @@ dist:
 	rm -rf ncdu-${NCDU_VERSION}
 
 
+# EDIT UPDATE TODO WIP: regressed in this branch, does not work,
+# fix in this branch later by moving as much as possible to build.zig!
 # ASSUMPTION:
 # - the ncurses source tree has been extracted into ncurses/
 # - the zstd source tree has been extracted into zstd/

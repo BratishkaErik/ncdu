@@ -7,7 +7,7 @@ const model = @import("model.zig");
 const sink = @import("sink.zig");
 const util = @import("util.zig");
 const ui = @import("ui.zig");
-const c = @import("c.zig").c;
+const c = @import("c");
 
 // JSON output is necessarily single-threaded and items MUST be added depth-first.
 
@@ -42,7 +42,7 @@ const ZstdWriter = struct {
         main.allocator.destroy(w);
     }
 
-    fn write(w: *ZstdWriter, f: std.fs.File, in: []const u8, flush: bool) !void {
+    fn write(w: *ZstdWriter, f: std.Io.File, in: []const u8, flush: bool) !void {
         var arg = c.ZSTD_inBuffer{
             .src = in.ptr,
             .size = in.len,
@@ -52,7 +52,7 @@ const ZstdWriter = struct {
             const v = c.ZSTD_compressStream2(w.ctx, &w.out, &arg, if (flush) c.ZSTD_e_end else c.ZSTD_e_continue);
             if (c.ZSTD_isError(v) != 0) return error.ZstdCompressError;
             if (flush or w.out.pos > w.outbuf.len / 2) {
-                try f.writeAll(w.outbuf[0..w.out.pos]);
+                try f.writeStreamingAll(main.io, w.outbuf[0..w.out.pos]);
                 w.out.pos = 0;
             }
             if (!flush and arg.pos == arg.size) break;
@@ -62,7 +62,7 @@ const ZstdWriter = struct {
 };
 
 pub const Writer = struct {
-    fd: std.fs.File,
+    fd: std.Io.File,
     zstd: ?*ZstdWriter = null,
     // Must be large enough to hold PATH_MAX*6 plus some overhead.
     // (The 6 is because, in the worst case, every byte expands to a "\u####"
@@ -78,7 +78,7 @@ pub const Writer = struct {
         // in which case we would probably have error'ed out earlier anyway.
         if (bytes > ctx.buf.len) ui.die("Error writing JSON export: path too long.\n", .{});
         const buf = ctx.buf[0..ctx.off];
-        (if (ctx.zstd) |z| z.write(ctx.fd, buf, bytes == 0) else ctx.fd.writeAll(buf)) catch |e|
+        (if (ctx.zstd) |z| z.write(ctx.fd, buf, bytes == 0) else ctx.fd.writeStreamingAll(main.io, buf)) catch |e|
             ui.die("Error writing to file: {s}.\n", .{ ui.errorString(e) });
         ctx.off = 0;
     }
@@ -138,12 +138,12 @@ pub const Writer = struct {
         ctx.write(buf[index..]);
     }
 
-    fn init(out: std.fs.File) *Writer {
+    fn init(out: std.Io.File) *Writer {
         var ctx = main.allocator.create(Writer) catch unreachable;
         ctx.* = .{ .fd = out };
         if (main.config.compress) ctx.zstd = ZstdWriter.create();
         ctx.write("[1,2,{\"progname\":\"ncdu\",\"progver\":\"" ++ main.program_version ++ "\",\"timestamp\":");
-        ctx.writeUint(@intCast(@max(0, std.time.timestamp())));
+        ctx.writeUint(@intCast(@max(0, std.Io.Clock.awake.now(main.io).toSeconds())));
         ctx.writeByte('}');
         return ctx;
     }
@@ -261,10 +261,10 @@ pub fn done() void {
     global.writer.write("]\n");
     global.writer.flush(0);
     if (global.writer.zstd) |z| z.destroy();
-    global.writer.fd.close();
+    global.writer.fd.close(main.io);
     main.allocator.destroy(global.writer);
 }
 
-pub fn setupOutput(out: std.fs.File) void {
+pub fn setupOutput(out: std.Io.File) void {
     global.writer = Writer.init(out);
 }

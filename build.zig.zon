@@ -1,0 +1,27 @@
+// SPDX-FileCopyrightText: 2026 Eric Joldasov <bratishkaerik@landless-city.net>
+//
+// SPDX-License-Identifier: MIT
+
+// Note: This manifest file was added to support the Zig package manager.
+// The original project and core source code were created by Yorhel.
+
+.{
+    .fingerprint = 0x91d20145_f54c759d,
+    .minimum_zig_version = "0.16.0",
+
+    .name = .ncdu,
+    .version = "2.10.0-dev",
+    .dependencies = .{
+        .translate_c = .{
+            .url = "git+https://codeberg.org/ziglang/translate-c?ref=zig-0.16.x#42f630117deffd5318b4a6ceffbd366dd0af8cee",
+            .hash = "translate_c-1.0.0-Q_BUWo75BgBmrtWsRz9QVUZlzvsSUUe_IIXD9vmWguhX",
+        },
+    },
+    .paths = .{
+        "LICENSES/",
+        "README.md",
+        "build.zig",
+        "build.zig.zon",
+        "src/",
+    },
+}
