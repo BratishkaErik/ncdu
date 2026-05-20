@@ -569,7 +569,7 @@ pub fn main(init: std.process.Init.Minimal) void {
         ui.die("Standard input is not a TTY. Did you mean to import a file using '-f -'?\n", .{});
     config.nc_tty = !in_tty or (if (export_json orelse export_bin) |f| std.mem.eql(u8, f, "-") else false);
 
-    event_delay_timer = std.Io.Clock.awake.now(io);
+    event_delay_timer = ui.clock.now(io);
     defer ui.deinit();
 
     if (export_json) |f| {
@@ -651,7 +651,7 @@ pub var event_delay_timer: std.Io.Timestamp = undefined;
 pub fn handleEvent(block: bool, force_draw: bool) void {
     while (ui.oom_threads.load(.monotonic) > 0) ui.oom();
 
-    if (block or force_draw or event_delay_timer.untilNow(io, .awake).toNanoseconds() > config.update_delay) {
+    if (block or force_draw or event_delay_timer.untilNow(io, ui.clock).toNanoseconds() > config.update_delay) {
         if (ui.inited) _ = c.erase();
         switch (state) {
             .scan, .refresh => sink.draw(),
@@ -660,7 +660,7 @@ pub fn handleEvent(block: bool, force_draw: bool) void {
             .shell => unreachable,
         }
         if (ui.inited) _ = c.refresh();
-        event_delay_timer = std.Io.Timestamp.now(io, .awake);
+        event_delay_timer = std.Io.Timestamp.now(io, ui.clock);
     }
     if (!ui.inited) {
         std.debug.assert(!block);

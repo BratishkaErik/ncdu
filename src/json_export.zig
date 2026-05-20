@@ -16,6 +16,10 @@ pub const global = struct {
 };
 
 
+/// For timestamps/output: use `.real` clock.
+/// Get the actual synchronized/epoch wall clock time.
+pub const clock: std.Io.Clock = .real;
+
 const ZstdWriter = struct {
     ctx: ?*c.ZSTD_CStream,
     out: c.ZSTD_outBuffer,
@@ -143,7 +147,7 @@ pub const Writer = struct {
         ctx.* = .{ .fd = out };
         if (main.config.compress) ctx.zstd = ZstdWriter.create();
         ctx.write("[1,2,{\"progname\":\"ncdu\",\"progver\":\"" ++ main.program_version ++ "\",\"timestamp\":");
-        ctx.writeUint(@intCast(@max(0, std.Io.Clock.awake.now(main.io).toSeconds())));
+        ctx.writeUint(@intCast(@max(0, clock.now(main.io).toSeconds())));
         ctx.writeByte('}');
         return ctx;
     }

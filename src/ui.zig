@@ -28,10 +28,12 @@ pub fn quit() noreturn {
     std.process.exit(0);
 }
 
-fn sleep(nanoseconds: u64) void {
-    const duration = std.Io.Duration.fromNanoseconds(nanoseconds);
-    const clock = std.Io.Clock.awake;
+/// For UI: use `.awake` (monotonic) clock. Ignore time changes
+/// when system goes to sleep or clock changes, we don't want
+/// storm of queued UI updates nor more delayed updates.
+pub const clock: std.Io.Clock = .awake;
 
+fn sleep(duration: std.Io.Duration) void {
     main.io.sleep(duration, clock) catch {};
 }
 
@@ -50,12 +52,12 @@ pub fn oom() void {
         const haveui = inited;
         deinit();
         std.debug.print("\x1b7\x1b[JOut of memory, trying again in 1 second. Hit Ctrl-C to abort.\x1b8", .{});
-        sleep(std.time.ns_per_s);
+        sleep(.fromSeconds(1));
         if (haveui)
             init();
     } else {
         _ = oom_threads.fetchAdd(1, .monotonic);
-        sleep(std.time.ns_per_s);
+        sleep(.fromSeconds(1));
         _ = oom_threads.fetchSub(1, .monotonic);
     }
 }
@@ -632,7 +634,7 @@ pub fn getch(block: bool) i32 {
         }
         if (ch == c.ERR) {
             if (!block) return 0;
-            sleep(10*std.time.ns_per_ms);
+            sleep(.fromMilliseconds(10));
             continue;
         }
         return ch;

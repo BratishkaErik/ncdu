@@ -140,7 +140,7 @@ pub fn loadDir(next_sel: u64) void {
     // XXX: The current dir listing is wiped before loading the new one, which
     // causes the screen to flicker a bit when the loading indicator is drawn.
     // Should we keep the old listing around?
-    main.event_delay_timer = std.Io.Timestamp.now(main.io, .awake);
+    main.event_delay_timer = std.Io.Timestamp.now(main.io, ui.clock);
     _ = dir_alloc.reset(.free_all);
     dir_items.shrinkRetainingCapacity(0);
     dir_refs.shrinkRetainingCapacity(0);
