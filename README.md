@@ -73,20 +73,39 @@ See the [ncdu 2 release announcement](https://dev.yorhel.nl/doc/ncdu2) for
 information about the differences between this Zig implementation (2.x) and the
 C version (1.x).
 
-## Requirements
+## Build Requirements
 
 - Zig 0.16
 - Some sort of POSIX-like OS
-- ncurses
-- libzstd
+
+## Library Dependencies
+
+- ncurses (must be installed on your system)
+- libzstd (can use Zig-packaged version, or system version)
 
 ## Install
 
 You can use the Zig build system if you're familiar with that.
+By default, Zig will fetch and build `libzstd` for you.
+If you want to use your system libzstd package instead, pass the `-fsys=zstd` flag:
 
-There's also a handy Makefile that supports the typical targets, e.g.:
-
+```shell
+zig build -fsys=zstd
 ```
+
+Alternatively, you can use system mode to automatically use system package:
+
+```shell
+zig build --system "path/to/downloaded/zig-packages/"
+```
+
+---
+
+There's also a handy Makefile that supports the typical targets. By default,
+the Makefile is configured to pass following flags to Zig build:
+`--release=fast -Dstrip -fsys=zstd`. You can override it with `ZIG_FLAGS`.
+
+```shell
 make
 sudo make install PREFIX=/usr
 ```

@@ -37,7 +37,30 @@ pub fn build(b: *std.Build) void {
     main_mod.addOptions("build_options", build_options);
 
     main_mod.linkSystemLibrary("ncursesw", .{});
-    main_mod.linkSystemLibrary("zstd", .{});
+
+    const use_system_zstd = b.systemIntegrationOption("zstd", .{});
+    if (use_system_zstd) {
+        main_mod.linkSystemLibrary("zstd", .{});
+    } else zstd: {
+        // These are settings used by release process
+        // (for tarballs with static binary)
+        const zstd_dep = b.lazyDependency("zstd", .{
+            .target = target,
+            .optimize = optimize,
+
+            .linkage = .static,
+            .strip = strip,
+            .pie = pie,
+
+            .compression = true,
+            .decompression = true,
+            .dictbuilder = false,
+            .minify = true,
+            .@"exclude-compressors-dfast-and-up" = true,
+        }) orelse break :zstd;
+        const zstd_lib = zstd_dep.artifact("zstd");
+        main_mod.linkLibrary(zstd_lib);
+    }
 
     const exe = b.addExecutable(.{
         .name = "ncdu",
