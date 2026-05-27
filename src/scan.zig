@@ -47,42 +47,101 @@ fn truncate(comptime T: type, comptime field: anytype, x: anytype) std.meta.fiel
 
 
 pub fn statAt(parent: std.Io.Dir, name: [:0]const u8, follow: bool, symlink: ?*bool) !sink.Stat {
-    // std.posix.fstatatZ() in Zig 0.14 is not suitable due to https://github.com/ziglang/zig/issues/23463
-    var stat: c.struct_stat = undefined;
-    if (c.fstatat(parent.handle, name, &stat, if (follow) 0 else c.AT_SYMLINK_NOFOLLOW) != 0) {
-        return switch (std.c._errno().*) {
-            c.ENOENT => error.FileNotFound,
-            c.ENAMETOOLONG => error.NameTooLong,
-            c.ENOMEM => error.OutOfMemory,
-            c.EACCES => error.AccessDenied,
-            else => error.Unexpected,
-        };
-    }
-    if (symlink) |s| s.* = c.S_ISLNK(stat.st_mode);
-    return sink.Stat{
-        .etype =
-            if (c.S_ISDIR(stat.st_mode)) .dir
-            else if (stat.st_nlink > 1) .link
-            else if (!c.S_ISREG(stat.st_mode)) .nonreg
-            else .reg,
-        .blocks = clamp(sink.Stat, .blocks, stat.st_blocks),
-        .size = clamp(sink.Stat, .size, stat.st_size),
-        .dev = truncate(sink.Stat, .dev, stat.st_dev),
-        .ino = truncate(sink.Stat, .ino, stat.st_ino),
-        .nlink = clamp(sink.Stat, .nlink, stat.st_nlink),
-        .ext = .{
-            .pack = .{
-                .hasmtime = true,
-                .hasuid = true,
-                .hasgid = true,
-                .hasmode = true,
-            },
-            .mtime = clamp(model.Ext, .mtime, stat.st_mtim.tv_sec),
-            .uid = truncate(model.Ext, .uid, stat.st_uid),
-            .gid = truncate(model.Ext, .gid, stat.st_gid),
-            .mode = truncate(model.Ext, .mode, stat.st_mode),
+    switch (@import("builtin").target.os.tag) {
+        // stat() seems gone for Linux since Zig 0.16.
+        // https://ziglang.org/download/0.16.0/release-notes.html#FileStat-Make-Access-Time-Optional
+        .linux => {
+            var stat: std.os.linux.Statx = undefined;
+            var flags: u32 = std.os.linux.AT.EMPTY_PATH;
+            if (!follow) flags |= std.os.linux.AT.SYMLINK_NOFOLLOW;
+            return switch (std.os.linux.errno(std.os.linux.statx(
+                parent.handle,
+                name,
+                flags,
+                std.os.linux.STATX{
+                    .TYPE = true,   // mutually exclusive with .MODE (implies .mode to include type)
+                    .BLOCKS = true,
+                    .SIZE = true,
+                    .INO = true,
+                    .NLINK = true,
+                    .UID = true,
+                    .GID = true,
+                    .MTIME = true,
+                },
+                &stat,
+            ))) {
+                .SUCCESS => {
+                    if (symlink) |s| s.* = std.c.S.ISLNK(stat.mode);
+                    return sink.Stat{
+                        .etype =
+                            if (std.os.linux.S.ISDIR(stat.mode)) .dir
+                            else if (stat.nlink > 1) .link
+                            else if (!std.os.linux.S.ISREG(stat.mode)) .nonreg
+                            else .reg,
+                        .blocks = @truncate(stat.blocks),
+                        .size = stat.size,
+                        .dev = stat.dev_major,
+                        .ino = stat.ino,
+                        .nlink = @truncate(stat.nlink),
+                        .ext = .{
+                            .pack = .{
+                                .hasmtime = true,
+                                .hasuid = true,
+                                .hasgid = true,
+                                .hasmode = true,
+                            },
+                            .mtime = @intCast(stat.mtime.sec),
+                            .uid = stat.uid,
+                            .gid = stat.gid,
+                            .mode = stat.mode,
+                        }
+                    };
+                },
+                .NOENT => error.FileNotFound,
+                .NAMETOOLONG => error.NameTooLong,
+                .NOMEM => error.OutOfMemory,
+                .ACCES => error.AccessDenied,
+                else => error.Unexpected,
+            };
         },
-    };
+        else => {
+            var stat: std.c.Stat = undefined;
+            if (std.c.fstatat(parent.handle, name, &stat, if (follow) 0 else std.c.AT.SYMLINK_NOFOLLOW) != 0) {
+                return switch (std.c._errno().*) {
+                    @intFromEnum(std.c.E.NOENT) => error.FileNotFound,
+                    @intFromEnum(std.c.E.NAMETOOLONG) => error.NameTooLong,
+                    @intFromEnum(std.c.E.NOMEM) => error.OutOfMemory,
+                    @intFromEnum(std.c.E.ACCES) => error.AccessDenied,
+                    else => error.Unexpected,
+                };
+            }
+            if (symlink) |s| s.* = std.c.S.ISLNK(stat.mode);
+            return sink.Stat{
+                .etype =
+                    if (std.c.S.ISDIR(stat.mode)) .dir
+                    else if (stat.nlink > 1) .link
+                    else if (!std.c.S.ISREG(stat.mode)) .nonreg
+                    else .reg,
+                .blocks = clamp(sink.Stat, .blocks, stat.blocks),
+                .size = clamp(sink.Stat, .size, stat.size),
+                .dev = truncate(sink.Stat, .dev, stat.dev),
+                .ino = truncate(sink.Stat, .ino, stat.ino),
+                .nlink = clamp(sink.Stat, .nlink, stat.nlink),
+                .ext = .{
+                    .pack = .{
+                        .hasmtime = true,
+                        .hasuid = true,
+                        .hasgid = true,
+                        .hasmode = true,
+                    },
+                    .mtime = clamp(model.Ext, .mtime, stat.mtime().sec),
+                    .uid = truncate(model.Ext, .uid, stat.uid),
+                    .gid = truncate(model.Ext, .gid, stat.gid),
+                    .mode = truncate(model.Ext, .mode, stat.mode),
+                },
+            };
+        }
+    }
 }
 
 
