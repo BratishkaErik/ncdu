@@ -1,0 +1,91 @@
+# SPDX-FileCopyrightText: 2026 Eric Joldasov <bratishkaerik@landless-city.net>
+#
+# SPDX-License-Identifier: CC0-1.0
+
+name: Zig CI
+
+on:
+  push:
+    branches:
+      - zig-version
+  pull_request:
+    branches:
+      - zig-version
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: ${{ matrix.os }} (${{ matrix.sys-libs && 'system' || 'fetched' }} libs)
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-latest, ubuntu-24.04-arm, macos-14 ]
+        sys-libs: [ true, false ]
+        exclude:
+          # Exclude macOS when using fetched libraries:
+          # TODO FIX: ncurses configure complain about:
+          # ../ncurses/tinfo/lib_baudrate.c:82:10: fatal error: 'sys/ttydev.h' file not found
+          - os: macos-14
+            sys-libs: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+
+      - name: Setup Zig
+        id: setup-zig
+        uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2
+
+      - name: Install dependencies (Ubuntu)
+        if: matrix.sys-libs && startsWith(matrix.os, 'ubuntu')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libncurses-dev libzstd-dev
+
+      - name: Install dependencies (macOS)
+        if: matrix.sys-libs && startsWith(matrix.os, 'macos')
+        run: brew install ncurses zstd
+
+      - name: Set Zig Build Flags
+        shell: bash
+        env:
+          SYS_LIBS: ${{ matrix.sys-libs }}
+        run: |
+          FLAGS="-Doptimize=ReleaseSafe -Dpie"
+          if [ "${SYS_LIBS}" = "true" ]; then
+            FLAGS+=" -fsys=ncurses -fsys=zstd"
+          else
+            FLAGS+=" -fno-sys=ncurses -fno-sys=zstd"
+          fi
+          echo "ZIG_FLAGS=${FLAGS}" >> $GITHUB_ENV
+
+      - name: Build
+        env:
+          ZIG_FLAGS: ${{ env.ZIG_FLAGS }}
+        run: zig build ${ZIG_FLAGS}
+
+      - name: Verify JSON Export
+        shell: bash
+        run: |
+          # Use src/ folder content
+          # to keep the export small for job summary
+          ./zig-out/bin/ncdu ./src -o export.json
+          echo "### Scan Export (src/)" >> $GITHUB_STEP_SUMMARY
+          echo '```json' >> $GITHUB_STEP_SUMMARY
+          cat export.json >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Run Tests
+        if: always() && steps.setup-zig.outcome == 'success'
+        env:
+          ZIG_FLAGS: ${{ env.ZIG_FLAGS }}
+        run: zig build test ${ZIG_FLAGS}

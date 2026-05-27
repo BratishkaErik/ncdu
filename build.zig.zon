@@ -28,7 +28,10 @@
         },
     },
     .paths = .{
-        "LICENSES/",
+        "LICENSES/MIT.txt",
+        // "LICENSES/CC0-1.0.txt" not included, because files with this license
+        // are not included.
+
         "README.md",
         "build.zig",
         "build.zig.zon",
