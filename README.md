@@ -80,20 +80,29 @@ C version (1.x).
 
 ## Library Dependencies
 
-- ncurses (must be installed on your system)
-- libzstd (can use Zig-packaged version, or system version)
+- ncurses
+- libzstd
+
+Both libraries can be fetched and built automatically by Zig, or you can use
+your system's installed versions.
 
 ## Install
 
 You can use the Zig build system if you're familiar with that.
-By default, Zig will fetch and build `libzstd` for you.
-If you want to use your system libzstd package instead, pass the `-fsys=zstd` flag:
+By default, Zig will fetch and build `ncurses` and `libzstd` for you.
+If you want to use your system package instead, pass the `-fsys=[...]` flag.
+You can mix and match these depending on what you have installed locally:
 
 ```shell
-zig build -fsys=zstd
+# Use system versions for both libraries
+zig build -fsys=ncurses -fsys=zstd
+
+# Use system ncurses, but let Zig fetch libzstd
+zig build -fsys=ncurses -fno-sys=zstd
 ```
 
-Alternatively, you can use system mode to automatically use system package:
+Alternatively, you can use system mode to automatically use system packages
+for all dependencies:
 
 ```shell
 zig build --system "path/to/downloaded/zig-packages/"
@@ -103,7 +112,8 @@ zig build --system "path/to/downloaded/zig-packages/"
 
 There's also a handy Makefile that supports the typical targets. By default,
 the Makefile is configured to pass following flags to Zig build:
-`--release=fast -Dstrip -fsys=zstd`. You can override it with `ZIG_FLAGS`.
+`--release=fast -Dstrip -fsys=zstd -fsys=ncurses`.
+You can override it with `ZIG_FLAGS`.
 
 ```shell
 make

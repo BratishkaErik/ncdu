@@ -21,6 +21,11 @@
             .hash = "zstd-1.5.7-2-KEItkAMwAADNhCbGaImKrjXjnSA51jcqEbGCA3RasVZ9",
             .lazy = true,
         },
+        .ncurses = .{
+            .url = "https://ftp.gnu.org/gnu/ncurses/ncurses-6.5.tar.gz",
+            .hash = "N-V-__8AAMZOFwGYoq9VA4jW9LOy4Ud9bufE7x2ep88NNqFr",
+            .lazy = true,
+        },
     },
     .paths = .{
         "LICENSES/",
