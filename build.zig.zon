@@ -22,8 +22,8 @@
             .lazy = true,
         },
         .ncurses = .{
-            .url = "https://ftp.gnu.org/gnu/ncurses/ncurses-6.5.tar.gz",
-            .hash = "N-V-__8AAMZOFwGYoq9VA4jW9LOy4Ud9bufE7x2ep88NNqFr",
+            .url = "git+https://github.com/dasimmet/ncurses.git#3f321d565df8df3c10b2671fba93a8f0ea7cc40a",
+            .hash = "ncurses-6.5.20240427-mGIXmPcPAwDWmbmR6swaucKSiizyJ8Uo3H4OGKfFDVOA",
             .lazy = true,
         },
     },
