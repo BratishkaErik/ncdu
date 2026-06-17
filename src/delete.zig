@@ -10,7 +10,7 @@ const scan = @import("scan.zig");
 const sink = @import("sink.zig");
 const mem_sink = @import("mem_sink.zig");
 const util = @import("util.zig");
-const c = @import("c.zig").c;
+const c = @import("c");
 
 var parent: *model.Dir = undefined;
 var entry: *model.Entry = undefined;
@@ -42,30 +42,30 @@ fn err(e: anyerror) bool {
     return main.state != .delete;
 }
 
-fn deleteItem(dir: std.fs.Dir, path: [:0]const u8, ptr: *align(1) ?*model.Entry) bool {
+fn deleteItem(dir: std.Io.Dir, path: [:0]const u8, ptr: *align(1) ?*model.Entry) bool {
     entry = ptr.*.?;
     main.handleEvent(false, false);
     if (main.state != .delete)
         return true;
 
     if (entry.dir()) |d| {
-        var fd = dir.openDirZ(path, .{ .no_follow = true, .iterate = false }) catch |e| return err(e);
+        var fd = dir.openDir(main.io, path, .{ .follow_symlinks = false, .iterate = false }) catch |e| return err(e);
         var it = &d.sub.ptr;
         parent = d;
         defer parent = parent.parent.?;
         while (it.*) |n| {
             if (deleteItem(fd, n.name(), it)) {
-                fd.close();
+                fd.close(main.io);
                 return true;
             }
             if (it.* == n) // item deletion failed, make sure to still advance to next
                 it = &n.next.ptr;
         }
-        fd.close();
-        dir.deleteDirZ(path) catch |e|
+        fd.close(main.io);
+        dir.deleteDir(main.io, path) catch |e|
             return if (e != error.DirNotEmpty or d.sub.ptr == null) err(e) else false;
     } else
-        dir.deleteFileZ(path) catch |e| return err(e);
+        dir.deleteFile(main.io, path) catch |e| return err(e);
     ptr.*.?.zeroStats(parent);
     ptr.* = ptr.*.?.next.ptr;
     return false;
@@ -74,7 +74,7 @@ fn deleteItem(dir: std.fs.Dir, path: [:0]const u8, ptr: *align(1) ?*model.Entry)
 // Returns true if the item has been deleted successfully.
 fn deleteCmd(path: [:0]const u8, ptr: *align(1) ?*model.Entry) bool {
     {
-        var env = std.process.getEnvMap(main.allocator) catch unreachable;
+        var env = main.env.createMap(main.allocator) catch unreachable;
         defer env.deinit();
         env.put("NCDU_DELETE_PATH", path) catch unreachable;
 
@@ -86,7 +86,7 @@ fn deleteCmd(path: [:0]const u8, ptr: *align(1) ?*model.Entry) bool {
         ui.runCmd(&.{"/bin/sh", "-c", cmd}, null, &env, true);
     }
 
-    const stat = scan.statAt(std.fs.cwd(), path, false, null) catch {
+    const stat = scan.statAt(std.Io.Dir.cwd(), path, false, null) catch {
         // Stat failed. Would be nice to display an error if it's not
         // 'FileNotFound', but w/e, let's just assume the item has been
         // deleted as expected.
@@ -144,7 +144,7 @@ pub fn delete() ?*model.Entry {
     path.appendSlice(main.allocator, entry.name()) catch unreachable;
 
     if (main.config.delete_command.len == 0) {
-        _ = deleteItem(std.fs.cwd(), util.arrayListBufZ(&path, main.allocator), it);
+        _ = deleteItem(std.Io.Dir.cwd(), util.arrayListBufZ(&path, main.allocator), it);
         model.inodes.addAllStats();
         return if (it.* == e) e else next_sel;
     } else {

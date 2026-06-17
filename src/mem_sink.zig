@@ -28,8 +28,8 @@ pub fn statToEntry(stat: *const sink.Stat, e: *model.Entry, parent: *model.Dir) 
         l.parent = parent;
         l.ino = stat.ino;
         l.pack.nlink = stat.nlink;
-        model.inodes.lock.lock();
-        defer model.inodes.lock.unlock();
+        model.inodes.lock.lockUncancelable(main.io);
+        defer model.inodes.lock.unlock(main.io);
         l.addLink();
     }
     if (e.ext()) |ext| ext.* = stat.ext;
@@ -49,7 +49,7 @@ pub const Dir = struct {
     items: u32 = 0,
     mtime: u64 = 0,
     suberr: bool = false,
-    lock: std.Thread.Mutex = .{},
+    lock: std.Io.Mutex = .init,
 
     const Map = std.HashMap(*model.Entry, void, HashContext, 80);
 
@@ -161,8 +161,8 @@ pub const Dir = struct {
 
         // Add own counts to parent
         if (parent) |p| {
-            p.lock.lock();
-            defer p.lock.unlock();
+            p.lock.lockUncancelable(main.io);
+            defer p.lock.unlock(main.io);
             p.blocks +|= self.dir.entry.pack.blocks - self.own_blocks;
             p.bytes +|= self.dir.entry.size - self.own_bytes;
             p.items +|= self.dir.items;

@@ -7,13 +7,13 @@ const model = @import("model.zig");
 const sink = @import("sink.zig");
 const util = @import("util.zig");
 const ui = @import("ui.zig");
-const c = @import("c.zig").c;
+const c = @import("c");
 
 pub const global = struct {
-    var fd: std.fs.File = undefined;
+    var fd: std.Io.File = undefined;
     var index: std.ArrayListUnmanaged(u8) = .empty;
     var file_off: u64 = 0;
-    var lock: std.Thread.Mutex = .{};
+    var lock: std.Io.Mutex = .init;
     var root_itemref: u64 = 0;
 };
 
@@ -125,8 +125,8 @@ pub const Thread = struct {
         var block = createBlock(t);
         defer block.deinit(main.allocator);
 
-        global.lock.lock();
-        defer global.lock.unlock();
+        global.lock.lockUncancelable(main.io);
+        defer global.lock.unlock(main.io);
         // This can only really happen when the root path exceeds our block size,
         // in which case we would probably have error'ed out earlier anyway.
         if (expected_len > t.buf.len) ui.die("Error writing data: path too long.\n", .{});
@@ -135,13 +135,13 @@ pub const Thread = struct {
             if (global.file_off >= (1<<40)) ui.die("Export data file has grown too large, please report a bug.\n", .{});
             global.index.items[4..][t.block_num*8..][0..8].* = bigu64((global.file_off << 24) + block.items.len);
             global.file_off += block.items.len;
-            global.fd.writeAll(block.items) catch |e|
+            global.fd.writeStreamingAll(main.io, block.items) catch |e|
                 ui.die("Error writing to file: {s}.\n", .{ ui.errorString(e) });
         }
 
         t.off = 0;
         t.block_num = @intCast((global.index.items.len - 4) / 8);
-        global.index.appendSlice(main.allocator, &[1]u8{0}**8) catch unreachable;
+        global.index.appendSlice(main.allocator, &@as([8]u8, @splat(0))) catch unreachable;
         if (global.index.items.len + 12 >= (1<<28)) ui.die("Too many data blocks, please report a bug.\n", .{});
 
         const newsize = blockSize(t.block_num);
@@ -246,7 +246,7 @@ pub const Dir = struct {
     // I'm not expecting much lock contention, but it's possible to turn
     // last_item into an atomic integer and other fields could be split up for
     // subdir use.
-    lock: std.Thread.Mutex = .{},
+    lock: std.Io.Mutex = .init,
     last_sub: ?u64 = null,
     stat: sink.Stat,
     items: u64 = 0,
@@ -268,8 +268,8 @@ pub const Dir = struct {
 
 
     pub fn addSpecial(d: *Dir, t: *Thread, name: []const u8, sp: model.EType) void {
-        d.lock.lock();
-        defer d.lock.unlock();
+        d.lock.lockUncancelable(main.io);
+        defer d.lock.unlock(main.io);
         d.items += 1;
         if (sp == .err) d.suberr = true;
         d.last_sub = t.itemStart(sp, d.last_sub, name);
@@ -277,8 +277,8 @@ pub const Dir = struct {
     }
 
     pub fn addStat(d: *Dir, t: *Thread, name: []const u8, stat: *const sink.Stat) void {
-        d.lock.lock();
-        defer d.lock.unlock();
+        d.lock.lockUncancelable(main.io);
+        defer d.lock.unlock(main.io);
         d.items += 1;
         if (stat.etype != .link) {
             d.size +|= stat.size;
@@ -309,8 +309,8 @@ pub const Dir = struct {
     }
 
     pub fn addDir(d: *Dir, stat: *const sink.Stat) Dir {
-        d.lock.lock();
-        defer d.lock.unlock();
+        d.lock.lockUncancelable(main.io);
+        defer d.lock.unlock(main.io);
         d.items += 1;
         d.size +|= stat.size;
         d.blocks +|= stat.blocks;
@@ -318,8 +318,8 @@ pub const Dir = struct {
     }
 
     pub fn setReadError(d: *Dir) void {
-        d.lock.lock();
-        defer d.lock.unlock();
+        d.lock.lockUncancelable(main.io);
+        defer d.lock.unlock(main.io);
         d.err = true;
     }
 
@@ -375,8 +375,8 @@ pub const Dir = struct {
     }
 
     pub fn final(d: *Dir, t: *Thread, name: []const u8, parent: ?*Dir) void {
-        if (parent) |p| p.lock.lock();
-        defer if (parent) |p| p.lock.unlock();
+        if (parent) |p| p.lock.lockUncancelable(main.io);
+        defer if (parent) |p| p.lock.unlock(main.io);
 
         if (parent) |p| {
             // Different dev? Don't merge the 'inodes' sets, just count the
@@ -445,21 +445,21 @@ pub fn done(threads: []sink.Thread) void {
         main.allocator.free(t.sink.bin.buf);
     }
 
-    while (std.mem.endsWith(u8, global.index.items, &[1]u8{0}**8))
+    while (std.mem.endsWith(u8, global.index.items, &@as([8]u8, @splat(0))))
         global.index.shrinkRetainingCapacity(global.index.items.len - 8);
     global.index.appendSlice(main.allocator, &bigu64(global.root_itemref)) catch unreachable;
     global.index.appendSlice(main.allocator, &blockHeader(1, @intCast(global.index.items.len + 4))) catch unreachable;
     global.index.items[0..4].* = blockHeader(1, @intCast(global.index.items.len));
-    global.fd.writeAll(global.index.items) catch |e|
+    global.fd.writeStreamingAll(main.io, global.index.items) catch |e|
         ui.die("Error writing to file: {s}.\n", .{ ui.errorString(e) });
     global.index.clearAndFree(main.allocator);
 
-    global.fd.close();
+    global.fd.close(main.io);
 }
 
-pub fn setupOutput(fd: std.fs.File) void {
+pub fn setupOutput(fd: std.Io.File) void {
     global.fd = fd;
-    fd.writeAll(SIGNATURE) catch |e|
+    fd.writeStreamingAll(main.io, SIGNATURE) catch |e|
         ui.die("Error writing to file: {s}.\n", .{ ui.errorString(e) });
     global.file_off = 8;
 

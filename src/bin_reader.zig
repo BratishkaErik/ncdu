@@ -8,7 +8,7 @@ const util = @import("util.zig");
 const sink = @import("sink.zig");
 const ui = @import("ui.zig");
 const bin_export = @import("bin_export.zig");
-const c = @import("c.zig").c;
+const c = @import("c");
 
 
 const CborMajor = bin_export.CborMajor;
@@ -39,9 +39,9 @@ const ItemKey = bin_export.ItemKey;
 // This file only implements (2) at the moment.
 
 pub const global = struct {
-    var fd: std.fs.File = undefined;
+    var fd: std.Io.File = undefined;
     var index: []u8 = undefined;
-    var blocks: [8]Block = [1]Block{.{}}**8;
+    var blocks: [8]Block = @splat(Block{});
     var counter: u64 = 0;
 
     // Last itemref being read/parsed. This is a hack to provide *some* context on error.
@@ -97,7 +97,7 @@ fn readBlock(num: u32) []const u8 {
     // Only read the compressed data part, assume block header, number and footer are correct.
     const buf = main.allocator.alloc(u8, @intCast(len - 12)) catch unreachable;
     defer main.allocator.free(buf);
-    const rdlen = global.fd.preadAll(buf, off + 8)
+    const rdlen = global.fd.readPositionalAll(main.io, buf, off + 8)
         catch |e| ui.die("Error reading from file: {s}\n", .{ui.errorString(e)});
     if (rdlen != buf.len) die();
 
@@ -233,8 +233,8 @@ const CborVal = struct {
 
     fn etype(v: *const CborVal) model.EType {
         const n = v.int(i32);
-        return std.meta.intToEnum(model.EType, n)
-            catch if (n < 0) .pattern else .nonreg;
+        return std.enums.fromInt(model.EType, n)
+            orelse if (n < 0) .pattern else .nonreg;
     }
 
     fn itemref(v: *const CborVal, cur: u64) u64 {
@@ -500,22 +500,24 @@ pub fn import() void {
     sink.done();
 }
 
+const shim = @import("shim.zig");
+
 // Assumes that the file signature has already been read and validated.
-pub fn open(fd: std.fs.File) !void {
+pub fn open(fd: std.Io.File) !void {
     global.fd = fd;
 
     // Do not use fd.getEndPos() because that requires newer kernels supporting statx() #261.
-    try fd.seekFromEnd(0);
-    const size = try fd.getPos();
+    try shim.seekFromEnd(fd, 0);
+    const size = try shim.getPos(fd);
     if (size < 16) return error.EndOfStream;
 
     // Read index block
     var buf: [4]u8 = undefined;
-    if (try fd.preadAll(&buf, size - 4) != 4) return error.EndOfStream;
+    if (try fd.readPositionalAll(main.io, &buf, size - 4) != 4) return error.EndOfStream;
     const index_header = bigu32(buf);
     if ((index_header >> 28) != 1 or (index_header & 7) != 0) die();
     const len = (index_header & 0x0fffffff) - 8; // excluding block header & footer
     if (len >= size) die();
     global.index = main.allocator.alloc(u8, len) catch unreachable;
-    if (try fd.preadAll(global.index, size - len - 4) != global.index.len) return error.EndOfStream;
+    if (try fd.readPositionalAll(main.io, global.index, size - len - 4) != global.index.len) return error.EndOfStream;
 }

@@ -3,7 +3,9 @@
 
 const std = @import("std");
 const main = @import("main.zig");
-const c = @import("c.zig").c;
+const c = @import("c");
+
+const dupeZ = @import("util.zig").dupeZ;
 
 // Reference:
 //   https://manned.org/glob.7
@@ -55,12 +57,12 @@ const Pattern = struct {
     }
 
     fn parse(pat_: []const u8) *const Pattern {
-        var pat = std.mem.trimLeft(u8, pat_, "/");
+        var pat = std.mem.trimStart(u8, pat_, "/");
         const top = main.allocator.create(Pattern) catch unreachable;
         var tail = top;
         tail.sub = null;
         while (std.mem.indexOfScalar(u8, pat, '/')) |idx| {
-            tail.pattern = main.allocator.dupeZ(u8, pat[0..idx]) catch unreachable;
+            tail.pattern = dupeZ(main.allocator, pat[0..idx]) catch unreachable;
             tail.isdir = true;
             tail.isliteral = isLiteral(tail.pattern);
             pat = pat[idx+1..];
@@ -71,7 +73,7 @@ const Pattern = struct {
             tail = next;
             tail.sub = null;
         }
-        tail.pattern = main.allocator.dupeZ(u8, pat) catch unreachable;
+        tail.pattern = dupeZ(main.allocator, pat) catch unreachable;
         tail.isdir = false;
         tail.isliteral = isLiteral(tail.pattern);
         return top;
@@ -150,7 +152,7 @@ fn PatternList(comptime withsub: bool) type {
                 const e = self.literals.getOrPut(main.allocator, pat) catch unreachable;
                 if (!e.found_existing) {
                     e.key_ptr.* = pat;
-                    e.value_ptr.* = if (withsub) .{} else {};
+                    e.value_ptr.* = if (withsub) .empty else {};
                 }
                 if (!withsub and !pat.isdir and e.key_ptr.*.isdir) e.key_ptr.* = pat;
                 if (withsub) {
@@ -250,7 +252,7 @@ pub fn getPatterns(path_: []const u8) Patterns {
     var pat = root;
     defer pat.deinit();
     while (std.mem.indexOfScalar(u8, path, '/')) |idx| {
-        const name = main.allocator.dupeZ(u8, path[0..idx]) catch unreachable;
+        const name = dupeZ(main.allocator, path[0..idx]) catch unreachable;
         defer main.allocator.free(name);
         path = path[idx+1..];
 
@@ -259,7 +261,7 @@ pub fn getPatterns(path_: []const u8) Patterns {
         pat = sub;
     }
 
-    const name = main.allocator.dupeZ(u8, path) catch unreachable;
+    const name = dupeZ(main.allocator, path) catch unreachable;
     defer main.allocator.free(name);
     return pat.enter(name);
 }

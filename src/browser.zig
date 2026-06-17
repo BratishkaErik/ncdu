@@ -9,8 +9,11 @@ const mem_sink = @import("mem_sink.zig");
 const bin_reader = @import("bin_reader.zig");
 const delete = @import("delete.zig");
 const ui = @import("ui.zig");
-const c = @import("c.zig").c;
+const c = @import("c");
 const util = @import("util.zig");
+
+const dupeZ = util.dupeZ;
+const bufPrintZ = util.bufPrintZ;
 
 // Currently opened directory.
 pub var dir_parent: *model.Dir = undefined;
@@ -137,7 +140,7 @@ pub fn loadDir(next_sel: u64) void {
     // XXX: The current dir listing is wiped before loading the new one, which
     // causes the screen to flicker a bit when the loading indicator is drawn.
     // Should we keep the old listing around?
-    main.event_delay_timer.reset();
+    main.event_delay_timer = std.Io.Timestamp.now(main.io, ui.clock);
     _ = dir_alloc.reset(.free_all);
     dir_items.shrinkRetainingCapacity(0);
     dir_refs.shrinkRetainingCapacity(0);
@@ -190,7 +193,7 @@ pub fn initRoot() void {
         dir_parent = model.root;
         dir_parents.append(main.allocator, .{ .ptr = &dir_parent.entry }) catch unreachable;
     }
-    dir_path = main.allocator.dupeZ(u8, dir_parent.entry.name()) catch unreachable;
+    dir_path = dupeZ(main.allocator, dir_parent.entry.name()) catch unreachable;
     loadDir(0);
 }
 
@@ -224,7 +227,7 @@ fn enterParent() void {
     } else
         dir_parent = p.ptr.?.dir() orelse unreachable;
 
-    const newpath = main.allocator.dupeZ(u8, std.fs.path.dirname(dir_path) orelse unreachable) catch unreachable;
+    const newpath = dupeZ(main.allocator, std.fs.path.dirname(dir_path) orelse unreachable) catch unreachable;
     main.allocator.free(dir_path);
     dir_path = newpath;
 }
@@ -541,13 +544,13 @@ const info = struct {
             if (ext.pack.hasuid) {
                 ui.addstr("  UID: ");
                 ui.style(.default);
-                ui.addstr(std.fmt.bufPrintZ(&buf, "{d:<6}", .{ ext.uid }) catch unreachable);
+                ui.addstr(bufPrintZ(&buf, "{d:<6}", .{ ext.uid }) catch unreachable);
                 ui.style(.bold);
             }
             if (ext.pack.hasgid) {
                 ui.addstr(" GID: ");
                 ui.style(.default);
-                ui.addstr(std.fmt.bufPrintZ(&buf, "{d:<6}", .{ ext.gid }) catch unreachable);
+                ui.addstr(bufPrintZ(&buf, "{d:<6}", .{ ext.gid }) catch unreachable);
             }
         } else {
             ui.addstr("Type: ");
@@ -596,7 +599,7 @@ const info = struct {
             ui.addstr("  Inode: ");
             ui.style(.default);
             var buf: [32]u8 = undefined;
-            ui.addstr(std.fmt.bufPrintZ(&buf, "{}", .{ l.ino }) catch unreachable);
+            ui.addstr(bufPrintZ(&buf, "{}", .{ l.ino }) catch unreachable);
             row.* += 1;
         }
     }

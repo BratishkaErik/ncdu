@@ -211,7 +211,7 @@ pub const Dir = extern struct {
     // (Old C habits die hard)
     name: [0]u8 = undefined,
 
-    pub const Packed = packed struct {
+    pub const Packed = packed struct(u32) {
         // Indexes into the global 'devices.list' array
         dev: DevId = 0,
         err: bool = false,
@@ -350,15 +350,15 @@ pub const Ext = extern struct {
 // List of st_dev entries. Those are typically 64bits, but that's quite a waste
 // of space when a typical scan won't cover many unique devices.
 pub const devices = struct {
-    var lock = std.Thread.Mutex{};
+    var lock: std.Io.Mutex = .init;
     // id -> dev
     pub var list: std.ArrayListUnmanaged(u64) = .empty;
     // dev -> id
     var lookup = std.AutoHashMap(u64, DevId).init(main.allocator);
 
     pub fn getId(dev: u64) DevId {
-        lock.lock();
-        defer lock.unlock();
+        lock.lockUncancelable(main.io);
+        defer lock.unlock(main.io);
         const d = lookup.getOrPut(dev) catch unreachable;
         if (!d.found_existing) {
             if (list.items.len >= std.math.maxInt(DevId)) ui.die("Maximum number of device identifiers exceeded.\n", .{});
@@ -386,7 +386,7 @@ pub const inodes = struct {
     var uncounted = std.HashMap(*Link, void, HashContext, 80).init(main.allocator);
     var uncounted_full = true; // start with true for the initial scan
 
-    pub var lock = std.Thread.Mutex{};
+    pub var lock: std.Io.Mutex = .init;
 
     const HashContext = struct {
         pub fn hash(_: @This(), l: *Link) u64 {

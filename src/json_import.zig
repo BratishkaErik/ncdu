@@ -7,7 +7,7 @@ const util = @import("util.zig");
 const model = @import("model.zig");
 const sink = @import("sink.zig");
 const ui = @import("ui.zig");
-const c = @import("c.zig").c;
+const c = @import("c");
 
 
 const ZstdReader = struct {
@@ -37,11 +37,11 @@ const ZstdReader = struct {
         main.allocator.destroy(r);
     }
 
-    fn read(r: *ZstdReader, f: std.fs.File, out: []u8) !usize {
+    fn read(r: *ZstdReader, f: *std.Io.Reader, out: []u8) !usize {
         while (true) {
             if (r.in.size == r.in.pos) {
                 r.in.pos = 0;
-                r.in.size = try f.read(&r.inbuf);
+                r.in.size = try f.readSliceShort(&r.inbuf);
                 if (r.in.size == 0) {
                     if (r.lastret == 0) return 0;
                     return error.ZstdDecompressError; // Early EOF
@@ -63,7 +63,7 @@ const ZstdReader = struct {
 // strings.
 
 const Parser = struct {
-    rd: std.fs.File,
+    rd: *std.Io.File.Reader,
     zstd: ?*ZstdReader = null,
     rdoff: usize = 0,
     rdsize: usize = 0,
@@ -84,7 +84,13 @@ const Parser = struct {
 
     fn fill(p: *Parser) void {
         p.rdoff = 0;
-        p.rdsize = (if (p.zstd) |z| z.read(p.rd, &p.buf) else p.rd.read(&p.buf)) catch |e| switch (e) {
+        p.rdsize = (if (p.zstd) |z|
+            z.read(&p.rd.interface, &p.buf)
+        else
+            p.rd.interface.readSliceShort(&p.buf) catch |e| switch (e) {
+                error.ReadFailed => p.rd.err orelse error.Unknown,
+            }
+        ) catch |e| switch (e) {
             error.IsDir => p.die("not a file"), // should be detected at open() time, but no flag for that...
             error.SystemResources => p.die("out of memory"),
             error.ZstdDecompressError => p.die("decompression error"),
@@ -528,11 +534,11 @@ fn item(ctx: *Ctx, parent: ?*sink.Dir, dev: u64) void {
 }
 
 
-pub fn import(fd: std.fs.File, head: []const u8) void {
+pub fn import(fr: *std.Io.File.Reader, head: []const u8) void {
     const sink_threads = sink.createThreads(1);
     defer sink.done();
 
-    var p = Parser{.rd = fd};
+    var p = Parser{.rd = fr};
     defer if (p.zstd) |z| z.destroy();
 
     if (head.len >= 4 and std.mem.eql(u8, head[0..4], "\x28\xb5\x2f\xfd")) {

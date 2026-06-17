@@ -1,0 +1,105 @@
+# SPDX-FileCopyrightText: 2026 Eric Joldasov <bratishkaerik@landless-city.net>
+#
+# SPDX-License-Identifier: CC0-1.0
+
+name: "Publish release to GitHub"
+
+on:
+  push:
+    tags:
+      # Publish on any tag starting with a `v`, e.g., v0.1.0
+      - v*
+
+permissions: { }
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build artifacts
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+
+      - name: Setup Zig
+        id: setup-zig
+        uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2
+        with:
+          use-cache: false
+
+      - name: Build and Package Dist
+        run: make dist
+
+      - name: Build Static Binaries
+        run: make static
+
+      - name: Organize Artifacts
+        run: |
+          mkdir -p dist
+          mv ncdu-*.tar.gz dist/
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: ncdu-dist
+          path: dist/
+          retention-days: 1
+          if-no-files-found: error
+
+  publish-github:
+    name: Publish to GitHub Releases
+    runs-on: ubuntu-latest
+    needs: [ build ]
+    environment:
+      name: github-releases
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Download clean build artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: ncdu-dist
+          path: dist/
+
+      - name: Generate Artifact Attestation
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4
+        with:
+          subject-path: "dist/*"
+
+      - name: Create GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IS_PRERELEASE: ${{
+            contains(github.ref_name, 'rc') ||
+            contains(github.ref_name, 'beta') ||
+            contains(github.ref_name, 'alpha') ||
+            contains(github.ref_name, 'dev') ||
+            contains(github.ref_name, 'test') }}
+        run: |
+          ARGS=()
+          if [ "${IS_PRERELEASE}" = "true" ]; then
+            ARGS+=("--prerelease")
+          fi
+
+          gh release create "${GITHUB_REF_NAME}" dist/* \
+            --title "${GITHUB_REF_NAME}" \
+            --generate-notes \
+            "${ARGS[@]}"

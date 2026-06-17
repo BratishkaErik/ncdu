@@ -8,13 +8,13 @@ const model = @import("model.zig");
 const sink = @import("sink.zig");
 const ui = @import("ui.zig");
 const exclude = @import("exclude.zig");
-const c = @import("c.zig").c;
+const c = @import("c");
 
 
 // This function only works on Linux
-fn isKernfs(dir: std.fs.Dir) bool {
+fn isKernfs(dir: std.Io.Dir) bool {
     var buf: c.struct_statfs = undefined;
-    if (c.fstatfs(dir.fd, &buf) != 0) return false; // silently ignoring errors isn't too nice.
+    if (c.fstatfs(dir.handle, &buf) != 0) return false; // silently ignoring errors isn't too nice.
     const iskern = switch (util.castTruncate(u32, buf.f_type)) {
         // These numbers are documented in the Linux 'statfs(2)' man page, so I assume they're stable.
         0x42494e4d, // BINFMTFS_MAGIC
@@ -46,52 +46,111 @@ fn truncate(comptime T: type, comptime field: anytype, x: anytype) std.meta.fiel
 }
 
 
-pub fn statAt(parent: std.fs.Dir, name: [:0]const u8, follow: bool, symlink: ?*bool) !sink.Stat {
-    // std.posix.fstatatZ() in Zig 0.14 is not suitable due to https://github.com/ziglang/zig/issues/23463
-    var stat: std.c.Stat = undefined;
-    if (std.c.fstatat(parent.fd, name, &stat, if (follow) 0 else std.c.AT.SYMLINK_NOFOLLOW) != 0) {
-        return switch (std.c._errno().*) {
-            @intFromEnum(std.c.E.NOENT) => error.FileNotFound,
-            @intFromEnum(std.c.E.NAMETOOLONG) => error.NameTooLong,
-            @intFromEnum(std.c.E.NOMEM) => error.OutOfMemory,
-            @intFromEnum(std.c.E.ACCES) => error.AccessDenied,
-            else => error.Unexpected,
-        };
-    }
-    if (symlink) |s| s.* = std.c.S.ISLNK(stat.mode);
-    return sink.Stat{
-        .etype =
-            if (std.c.S.ISDIR(stat.mode)) .dir
-            else if (stat.nlink > 1) .link
-            else if (!std.c.S.ISREG(stat.mode)) .nonreg
-            else .reg,
-        .blocks = clamp(sink.Stat, .blocks, stat.blocks),
-        .size = clamp(sink.Stat, .size, stat.size),
-        .dev = truncate(sink.Stat, .dev, stat.dev),
-        .ino = truncate(sink.Stat, .ino, stat.ino),
-        .nlink = clamp(sink.Stat, .nlink, stat.nlink),
-        .ext = .{
-            .pack = .{
-                .hasmtime = true,
-                .hasuid = true,
-                .hasgid = true,
-                .hasmode = true,
-            },
-            .mtime = clamp(model.Ext, .mtime, stat.mtime().sec),
-            .uid = truncate(model.Ext, .uid, stat.uid),
-            .gid = truncate(model.Ext, .gid, stat.gid),
-            .mode = truncate(model.Ext, .mode, stat.mode),
+pub fn statAt(parent: std.Io.Dir, name: [:0]const u8, follow: bool, symlink: ?*bool) !sink.Stat {
+    switch (@import("builtin").target.os.tag) {
+        // stat() seems gone for Linux since Zig 0.16.
+        // https://ziglang.org/download/0.16.0/release-notes.html#FileStat-Make-Access-Time-Optional
+        .linux => {
+            var stat: std.os.linux.Statx = undefined;
+            var flags: u32 = std.os.linux.AT.EMPTY_PATH;
+            if (!follow) flags |= std.os.linux.AT.SYMLINK_NOFOLLOW;
+            return switch (std.os.linux.errno(std.os.linux.statx(
+                parent.handle,
+                name,
+                flags,
+                std.os.linux.STATX{
+                    .TYPE = true,   // mutually exclusive with .MODE (implies .mode to include type)
+                    .BLOCKS = true,
+                    .SIZE = true,
+                    .INO = true,
+                    .NLINK = true,
+                    .UID = true,
+                    .GID = true,
+                    .MTIME = true,
+                },
+                &stat,
+            ))) {
+                .SUCCESS => {
+                    if (symlink) |s| s.* = std.c.S.ISLNK(stat.mode);
+                    return sink.Stat{
+                        .etype =
+                            if (std.os.linux.S.ISDIR(stat.mode)) .dir
+                            else if (stat.nlink > 1) .link
+                            else if (!std.os.linux.S.ISREG(stat.mode)) .nonreg
+                            else .reg,
+                        .blocks = @truncate(stat.blocks),
+                        .size = stat.size,
+                        .dev = stat.dev_major,
+                        .ino = stat.ino,
+                        .nlink = @truncate(stat.nlink),
+                        .ext = .{
+                            .pack = .{
+                                .hasmtime = true,
+                                .hasuid = true,
+                                .hasgid = true,
+                                .hasmode = true,
+                            },
+                            .mtime = @intCast(stat.mtime.sec),
+                            .uid = stat.uid,
+                            .gid = stat.gid,
+                            .mode = stat.mode,
+                        }
+                    };
+                },
+                .NOENT => error.FileNotFound,
+                .NAMETOOLONG => error.NameTooLong,
+                .NOMEM => error.OutOfMemory,
+                .ACCES => error.AccessDenied,
+                else => error.Unexpected,
+            };
         },
-    };
+        else => {
+            var stat: std.c.Stat = undefined;
+            if (std.c.fstatat(parent.handle, name, &stat, if (follow) 0 else std.c.AT.SYMLINK_NOFOLLOW) != 0) {
+                return switch (std.c._errno().*) {
+                    @intFromEnum(std.c.E.NOENT) => error.FileNotFound,
+                    @intFromEnum(std.c.E.NAMETOOLONG) => error.NameTooLong,
+                    @intFromEnum(std.c.E.NOMEM) => error.OutOfMemory,
+                    @intFromEnum(std.c.E.ACCES) => error.AccessDenied,
+                    else => error.Unexpected,
+                };
+            }
+            if (symlink) |s| s.* = std.c.S.ISLNK(stat.mode);
+            return sink.Stat{
+                .etype =
+                    if (std.c.S.ISDIR(stat.mode)) .dir
+                    else if (stat.nlink > 1) .link
+                    else if (!std.c.S.ISREG(stat.mode)) .nonreg
+                    else .reg,
+                .blocks = clamp(sink.Stat, .blocks, stat.blocks),
+                .size = clamp(sink.Stat, .size, stat.size),
+                .dev = truncate(sink.Stat, .dev, stat.dev),
+                .ino = truncate(sink.Stat, .ino, stat.ino),
+                .nlink = clamp(sink.Stat, .nlink, stat.nlink),
+                .ext = .{
+                    .pack = .{
+                        .hasmtime = true,
+                        .hasuid = true,
+                        .hasgid = true,
+                        .hasmode = true,
+                    },
+                    .mtime = clamp(model.Ext, .mtime, stat.mtime().sec),
+                    .uid = truncate(model.Ext, .uid, stat.uid),
+                    .gid = truncate(model.Ext, .gid, stat.gid),
+                    .mode = truncate(model.Ext, .mode, stat.mode),
+                },
+            };
+        }
+    }
 }
 
 
-fn isCacheDir(dir: std.fs.Dir) bool {
+fn isCacheDir(dir: std.Io.Dir) bool {
     const sig = "Signature: 8a477f597d28d172789f06886806bc55";
-    const f = dir.openFileZ("CACHEDIR.TAG", .{}) catch return false;
-    defer f.close();
+    const f = dir.openFile(main.io, "CACHEDIR.TAG", .{}) catch return false;
+    defer f.close(main.io);
     var buf: [sig.len]u8 = undefined;
-    const len = f.readAll(&buf) catch return false;
+    const len = f.readStreaming(main.io, &.{&buf}) catch return false;
     return len == sig.len and std.mem.eql(u8, &buf, sig);
 }
 
@@ -107,8 +166,8 @@ const State = struct {
     // impossible for me to predict how that ends up affecting performance.
     queue: [QUEUE_SIZE]*Dir = undefined,
     queue_len: std.atomic.Value(usize) = std.atomic.Value(usize).init(0),
-    queue_lock: std.Thread.Mutex = .{},
-    queue_cond: std.Thread.Condition = .{},
+    queue_lock: std.Io.Mutex = .init,
+    queue_cond: std.Io.Condition = .init,
 
     threads: []Thread,
     waiting: usize = 0,
@@ -121,28 +180,28 @@ const State = struct {
     fn tryPush(self: *State, d: *Dir) bool {
         if (self.queue_len.load(.acquire) == QUEUE_SIZE) return false;
         {
-            self.queue_lock.lock();
-            defer self.queue_lock.unlock();
+            self.queue_lock.lockUncancelable(main.io);
+            defer self.queue_lock.unlock(main.io);
             if (self.queue_len.load(.monotonic) == QUEUE_SIZE) return false;
             const slot = self.queue_len.fetchAdd(1, .monotonic);
             self.queue[slot] = d;
         }
-        self.queue_cond.signal();
+        self.queue_cond.signal(main.io);
         return true;
     }
 
     // Blocks while the queue is empty, returns null when all threads are blocking.
     fn waitPop(self: *State) ?*Dir {
-        self.queue_lock.lock();
-        defer self.queue_lock.unlock();
+        self.queue_lock.lockUncancelable(main.io);
+        defer self.queue_lock.unlock(main.io);
 
         self.waiting += 1;
         while (self.queue_len.load(.monotonic) == 0) {
             if (self.waiting == self.threads.len) {
-                self.queue_cond.broadcast();
+                self.queue_cond.broadcast(main.io);
                 return null;
             }
-            self.queue_cond.wait(&self.queue_lock);
+            self.queue_cond.waitUncancelable(main.io, &self.queue_lock);
         }
         self.waiting -= 1;
 
@@ -154,13 +213,13 @@ const State = struct {
 
 
 const Dir = struct {
-    fd: std.fs.Dir,
+    fd: std.Io.Dir,
     dev: u64,
     pat: exclude.Patterns,
-    it: std.fs.Dir.Iterator,
+    it: std.Io.Dir.Iterator,
     sink: *sink.Dir,
 
-    fn create(fd: std.fs.Dir, dev: u64, pat: exclude.Patterns, s: *sink.Dir) *Dir {
+    fn create(fd: std.Io.Dir, dev: u64, pat: exclude.Patterns, s: *sink.Dir) *Dir {
         const d = main.allocator.create(Dir) catch unreachable;
         d.* = .{
             .fd = fd,
@@ -174,7 +233,7 @@ const Dir = struct {
 
     fn destroy(d: *Dir, t: *Thread) void {
         d.pat.deinit();
-        d.fd.close();
+        d.fd.close(main.io);
         d.sink.unref(t.sink);
         main.allocator.destroy(d);
     }
@@ -185,7 +244,7 @@ const Thread = struct {
     sink: *sink.Thread,
     state: *State,
     stack: std.ArrayListUnmanaged(*Dir) = .empty,
-    thread: std.Thread = undefined,
+    thread: std.Io.Future(void) = undefined,
     namebuf: [4096]u8 = undefined,
 
     fn scanOne(t: *Thread, dir: *Dir, name_: []const u8) void {
@@ -239,7 +298,7 @@ const Thread = struct {
             return;
         }
 
-        var edir = dir.fd.openDirZ(name, .{ .no_follow = true, .iterate = true }) catch {
+        var edir = dir.fd.openDir(main.io, name, .{ .follow_symlinks = false, .iterate = true }) catch {
             const s = dir.sink.addDir(t.sink, name, &stat);
             s.setReadError(t.sink);
             s.unref(t.sink);
@@ -251,14 +310,14 @@ const Thread = struct {
             and stat.dev != dir.dev
             and isKernfs(edir)
         ) {
-            edir.close();
+            edir.close(main.io);
             dir.sink.addSpecial(t.sink, name, .kernfs);
             return;
         }
 
         if (main.config.exclude_caches and isCacheDir(edir)) {
             dir.sink.addSpecial(t.sink, name, .pattern);
-            edir.close();
+            edir.close(main.io);
             return;
         }
 
@@ -279,7 +338,7 @@ const Thread = struct {
                 t.sink.setDir(d.sink);
                 if (t.thread_num == 0) main.handleEvent(false, false);
 
-                const entry = d.it.next() catch blk: {
+                const entry = d.it.next(main.io) catch blk: {
                     dir.sink.setReadError(t.sink);
                     break :blk null;
                 };
@@ -299,8 +358,8 @@ pub fn scan(path: [:0]const u8) !void {
     defer sink.done();
 
     var symlink: bool = undefined;
-    const stat = try statAt(std.fs.cwd(), path, true, &symlink);
-    const fd = try std.fs.cwd().openDirZ(path, .{ .iterate = true });
+    const stat = try statAt(std.Io.Dir.cwd(), path, true, &symlink);
+    const fd = try std.Io.Dir.cwd().openDir(main.io, path, .{ .iterate = true });
 
     var state = State{
         .threads = main.allocator.alloc(Thread, main.config.threads) catch unreachable,
@@ -316,10 +375,10 @@ pub fn scan(path: [:0]const u8) !void {
 
     // XXX: Continue with fewer threads on error?
     for (state.threads[1..]) |*t| {
-        t.thread = std.Thread.spawn(
-            .{ .stack_size = 128 * 1024, .allocator = main.allocator }, Thread.run, .{t}
+        t.thread = main.io.concurrent(
+            Thread.run, .{t}
         ) catch |e| ui.die("Error spawning thread: {}\n", .{e});
     }
     state.threads[0].run();
-    for (state.threads[1..]) |*t| t.thread.join();
+    for (state.threads[1..]) |*t| t.thread.await(main.io);
 }

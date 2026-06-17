@@ -86,8 +86,8 @@ pub const Dir = struct {
             .bin => |*b| b.addSpecial(&t.sink.bin, name, sp),
         }
         if (sp == .err) {
-            global.last_error_lock.lock();
-            defer global.last_error_lock.unlock();
+            global.last_error_lock.lockUncancelable(main.io);
+            defer global.last_error_lock.unlock(main.io);
             if (global.last_error) |p| main.allocator.free(p);
             const p = d.path();
             global.last_error = std.fs.path.joinZ(main.allocator, &.{ p, name }) catch unreachable;
@@ -133,8 +133,8 @@ pub const Dir = struct {
             .json => |*j| j.setReadError(),
             .bin => |*b| b.setReadError(),
         }
-        global.last_error_lock.lock();
-        defer global.last_error_lock.unlock();
+        global.last_error_lock.lockUncancelable(main.io);
+        defer global.last_error_lock.unlock(main.io);
         if (global.last_error) |p| main.allocator.free(p);
         global.last_error = d.path();
     }
@@ -180,10 +180,10 @@ pub const Dir = struct {
 
 pub const Thread = struct {
     current_dir: ?*Dir = null,
-    lock: std.Thread.Mutex = .{},
+    lock: std.Io.Mutex = .init,
     // On 32-bit architectures, bytes_seen is protected by the above mutex instead.
-    bytes_seen: std.atomic.Value(u64) = std.atomic.Value(u64).init(0),
-    files_seen: std.atomic.Value(u32) = std.atomic.Value(u32).init(0),
+    bytes_seen: std.atomic.Value(u64) = .init(0),
+    files_seen: std.atomic.Value(u32) = .init(0),
 
     sink: union {
         mem: mem_sink.Thread,
@@ -194,8 +194,8 @@ pub const Thread = struct {
     fn addBytes(t: *Thread, bytes: u64) void {
         if (@bitSizeOf(usize) >= 64) _ = t.bytes_seen.fetchAdd(bytes, .monotonic)
         else {
-            t.lock.lock();
-            defer t.lock.unlock();
+            t.lock.lockUncancelable(main.io);
+            defer t.lock.unlock(main.io);
             t.bytes_seen.raw += bytes;
         }
     }
@@ -203,15 +203,15 @@ pub const Thread = struct {
     fn getBytes(t: *Thread) u64 {
         if (@bitSizeOf(usize) >= 64) return t.bytes_seen.load(.monotonic)
         else {
-            t.lock.lock();
-            defer t.lock.unlock();
+            t.lock.lockUncancelable(main.io);
+            defer t.lock.unlock(main.io);
             return t.bytes_seen.raw;
         }
     }
 
     pub fn setDir(t: *Thread, d: ?*Dir) void {
-        t.lock.lock();
-        defer t.lock.unlock();
+        t.lock.lockUncancelable(main.io);
+        defer t.lock.unlock(main.io);
         t.current_dir = d;
     }
 };
@@ -223,7 +223,7 @@ pub const global = struct {
     pub var sink: enum { json, mem, bin } = .mem;
 
     pub var last_error: ?[:0]u8 = null;
-    var last_error_lock = std.Thread.Mutex{};
+    var last_error_lock: std.Io.Mutex = .init;
     var need_confirm_quit = false;
 };
 
@@ -292,16 +292,16 @@ fn drawConsole() void {
         var ansi: ?bool = null;
         var lines_written: usize = 0;
     };
-    const stderr = if (@hasDecl(std.io, "getStdErr")) std.io.getStdErr() else std.fs.File.stderr();
+    const stderr: std.Io.File = .stderr();
     const ansi = st.ansi orelse blk: {
-        const t = stderr.supportsAnsiEscapeCodes();
+        const t = stderr.supportsAnsiEscapeCodes(main.io) catch false;
         st.ansi = t;
         break :blk t;
     };
 
     var buf: [4096]u8 = undefined;
-    var strm = std.io.fixedBufferStream(buf[0..]);
-    var wr = strm.writer();
+    var stderr_writer = stderr.writer(main.io, buf[0..]);
+    var wr = &stderr_writer.interface;
     while (ansi and st.lines_written > 0) {
         wr.writeAll("\x1b[1F\x1b[2K") catch {};
         st.lines_written -= 1;
@@ -327,8 +327,8 @@ fn drawConsole() void {
 
         for (global.threads, 0..) |*t, i| {
             const dir = blk: {
-                t.lock.lock();
-                defer t.lock.unlock();
+                t.lock.lockUncancelable(main.io);
+                defer t.lock.unlock(main.io);
                 break :blk if (t.current_dir) |d| d.path() else null;
             };
             wr.print("  #{}: {s}\n", .{i+1, ui.shorten(ui.toUtf8(dir orelse "(waiting)"), 73)}) catch {};
@@ -337,7 +337,7 @@ fn drawConsole() void {
         }
     }
 
-    stderr.writeAll(strm.getWritten()) catch {};
+    wr.flush() catch {};
 }
 
 
@@ -369,8 +369,8 @@ fn drawProgress() void {
         box.move(3+@as(u32, @intCast(i)), 4);
         const dir = blk: {
             const t = &global.threads[i];
-            t.lock.lock();
-            defer t.lock.unlock();
+            t.lock.lockUncancelable(main.io);
+            defer t.lock.unlock(main.io);
             break :blk if (t.current_dir) |d| d.path() else null;
         };
         ui.addstr(ui.shorten(ui.toUtf8(dir orelse "(waiting)"), width -| 6));
@@ -378,8 +378,8 @@ fn drawProgress() void {
     }
 
     blk: {
-        global.last_error_lock.lock();
-        defer global.last_error_lock.unlock();
+        global.last_error_lock.lockUncancelable(main.io);
+        defer global.last_error_lock.unlock(main.io);
         const err = global.last_error orelse break :blk;
         box.move(4 + numthreads, 2);
         ui.style(.bold);
