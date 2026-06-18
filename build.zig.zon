@@ -10,7 +10,7 @@
     .minimum_zig_version = "0.16.0",
 
     .name = .ncdu,
-    .version = "2.10.1-dev.1",
+    .version = "2.10.1-dev",
     .dependencies = .{
         .zstd = .{
             .url = "https://github.com/allyourcodebase/zstd/archive/refs/tags/1.5.7-2.tar.gz",

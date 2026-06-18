@@ -17,11 +17,65 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
-    name: Build artifacts
+  pack-source:
+    name: Package source code
     runs-on: ubuntu-latest
     permissions:
       contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+
+      - name: Archive source
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          mkdir -p dist
+
+          TIMESTAMP=$(git log -1 --format=%ct "${GITHUB_SHA}")
+          export SOURCE_DATE_EPOCH="$TIMESTAMP"
+
+          git -c tar.tgz.command="gzip -9 -n" archive --format=tar.gz \
+            --mtime="@${TIMESTAMP}" \
+            --prefix="ncdu-${VERSION}/" \
+            --output="dist/ncdu-${VERSION}-src.tar.gz" \
+            "${GITHUB_SHA}"
+
+      - name: Upload source artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: artifact-source
+          path: dist/
+          retention-days: 1
+
+  build-binaries:
+    name: Build static binaries (${{ matrix.target }})
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: read
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-linux-musl
+            arch_suffix: linux-x86_64
+            binutils: binutils
+
+          - target: x86-linux-musl
+            arch_suffix: linux-x86
+            binutils: binutils-i686-linux-gnu
+            strip_prefix: i686-linux-gnu-
+
+          - target: aarch64-linux-musl
+            arch_suffix: linux-aarch64
+            binutils: binutils-aarch64-linux-gnu
+            strip_prefix: aarch64-linux-gnu-
+
+          - target: arm-linux-musleabi
+            arch_suffix: linux-arm
+            binutils: binutils-arm-linux-gnueabi
+            strip_prefix: arm-linux-gnueabi-
 
     steps:
       - name: Checkout
@@ -35,21 +89,43 @@ jobs:
         with:
           use-cache: false
 
-      - name: Build and Package Dist
-        run: make dist
-
-      - name: Build Static Binaries
-        run: make static
-
-      - name: Organize Artifacts
+      - name: Build static binary
         run: |
-          mkdir -p dist
-          mv ncdu-*.tar.gz dist/
+          zig build -fno-sys=zstd -fno-sys=ncurses \
+            -Dtarget=${{ matrix.target }} -Dcpu=baseline --release=fast -Dstrip -Dpie \
+            --build-id=fast --prefix current-build
 
-      - name: Upload Build Artifacts
+      - name: Install strip
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ${{ matrix.binutils }}
+
+      - name: Strip debug symbols
+        run: ${{ matrix.strip_prefix }}strip -R .eh_frame -R .eh_frame_hdr current-build/bin/ncdu
+
+      - name: Package binary
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          mkdir -p dist
+
+          TIMESTAMP=$(git log -1 --format=%ct "${GITHUB_SHA}")
+          export SOURCE_DATE_EPOCH="$TIMESTAMP"
+
+          mv current-build/bin/ncdu current-build/ncdu
+          chmod 755 current-build/ncdu
+
+          tar --sort=name \
+              --mtime="@${TIMESTAMP}" \
+              --owner=0 --group=0 --numeric-owner \
+              -cf "dist/ncdu-${VERSION}-${{ matrix.arch_suffix }}.tar" \
+              -C current-build ncdu
+
+          gzip -9 -n "dist/ncdu-${VERSION}-${{ matrix.arch_suffix }}.tar"
+
+      - name: Upload binary artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: ncdu-dist
+          name: artifact-${{ matrix.target }}
           path: dist/
           retention-days: 1
           if-no-files-found: error
@@ -57,7 +133,7 @@ jobs:
   publish-github:
     name: Publish to GitHub Releases
     runs-on: ubuntu-latest
-    needs: [ build ]
+    needs: [ pack-source, build-binaries ]
     environment:
       name: github-releases
     permissions:
@@ -76,8 +152,9 @@ jobs:
       - name: Download clean build artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
-          name: ncdu-dist
+          pattern: artifact-*
           path: dist/
+          merge-multiple: true
 
       - name: Generate Artifact Attestation
         uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4
@@ -94,12 +171,22 @@ jobs:
             contains(github.ref_name, 'dev') ||
             contains(github.ref_name, 'test') }}
         run: |
-          ARGS=()
+          set -euo pipefail
+          shopt -s nullglob
+
+          ARGS=("--draft")
           if [ "${IS_PRERELEASE}" = "true" ]; then
             ARGS+=("--prerelease")
           fi
 
-          gh release create "${GITHUB_REF_NAME}" dist/* \
-            --title "${GITHUB_REF_NAME}" \
+          export LC_ALL=C
+          mapfile -t FILES < <(printf "%s\n" dist/* | sort -r)
+
+          git tag -l --format='%(contents:body)' "${GITHUB_REF_NAME}" > release_notes.md
+          echo -e "\n\n## GitHub generated notes\n" >> release_notes.md
+
+          gh release create "${GITHUB_REF_NAME}" "${FILES[@]}" \
+            --title "Release ${GITHUB_REF_NAME}" \
+            --notes-file release_notes.md \
             --generate-notes \
             "${ARGS[@]}"
