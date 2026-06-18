@@ -12,6 +12,10 @@
     .name = .ncdu,
     .version = "2.10.1-dev",
     .dependencies = .{
+        .translate_c = .{
+            .url = "https://codeberg.org/vancluever/translate-c/archive/119c5d0551c4b025d7a5d6963cf4dd32f9151a4b.tar.gz",
+            .hash = "translate_c-0.0.0-Q_BUWgpXBwDWbTJQO9Ul01ZN4NJ4CEqQ4ZX1vLrcy38W",
+        },
         .zstd = .{
             .url = "https://github.com/allyourcodebase/zstd/archive/refs/tags/1.5.7-2.tar.gz",
             .hash = "zstd-1.5.7-2-KEItkAMwAADNhCbGaImKrjXjnSA51jcqEbGCA3RasVZ9",
