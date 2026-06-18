@@ -14,38 +14,39 @@ pub fn build(b: *std.Build) void {
     const pie = b.option(bool, "pie", "Build with PIE support (by default: target-dependant)");
     const strip = b.option(bool, "strip", "Strip debugging info (by default false)") orelse false;
 
-    const main_mod = b.createModule(.{
-        .root_source_file = b.path("src/main.zig"),
-        .target = target,
-        .optimize = optimize,
-        .strip = strip,
-        .link_libc = true,
-    });
-
-    const t = b.addTranslateC(.{
-        .root_source_file = b.path("src/c.h"),
-        .target = target,
-        .optimize = optimize,
-        .link_libc = true,
-    });
-
     const use_system_ncurses = b.systemIntegrationOption("ncurses", .{});
+    const use_system_zstd = b.systemIntegrationOption("zstd", .{});
+
+    var sys_libs: std.ArrayList(Translator.LinkSystemLib) = .empty;
+    sys_libs.ensureUnusedCapacity(b.graph.arena, 2) catch @panic("OOM");
     if (use_system_ncurses) {
-        t.linkSystemLibrary("ncursesw", .{});
-    } else ncurses: {
+        sys_libs.appendAssumeCapacity(.{ .name = "ncurses" });
+    }
+    if (use_system_zstd) {
+        sys_libs.appendAssumeCapacity(.{ .name = "zstd" });
+    }
+
+    const translate_c = b.dependency("translate_c", .{});
+    const t: Translator = .init(translate_c, .{
+        .c_source_file = b.path("src/c.h"),
+        .target = target,
+        .optimize = optimize,
+
+        .link_system_libs = sys_libs.items,
+        .libc_file = if (b.libc_file) |libc_file| .{ .cwd_relative = libc_file } else null,
+    });
+
+    if (!use_system_ncurses) ncurses: {
         const ncurses_dep = b.lazyDependency("ncurses", .{}) orelse break :ncurses;
 
         const ncurses = buildNcurses(b, ncurses_dep, target.result, pie);
-        t.step.dependOn(&ncurses.step.step);
+        t.run.step.dependOn(&ncurses.step.step);
         t.addIncludePath(ncurses.inst_dir.path(b, "include/ncursesw"));
         t.addIncludePath(ncurses.inst_dir.path(b, "include"));
-        main_mod.addObjectFile(ncurses.inst_dir.path(b, "lib/libncursesw.a"));
+        t.mod.addObjectFile(ncurses.inst_dir.path(b, "lib/libncursesw.a"));
     }
 
-    const use_system_zstd = b.systemIntegrationOption("zstd", .{});
-    if (use_system_zstd) {
-        t.linkSystemLibrary("zstd", .{});
-    } else zstd: {
+    if (!use_system_zstd) zstd: {
         // These are settings used by release process
         // (for tarballs with static binary)
         const zstd_dep = b.lazyDependency("zstd", .{
@@ -64,10 +65,19 @@ pub fn build(b: *std.Build) void {
         }) orelse break :zstd;
         const zstd_lib = zstd_dep.artifact("zstd");
         t.addIncludePath(zstd_lib.getEmittedIncludeTree());
-        main_mod.linkLibrary(zstd_lib);
+        t.mod.linkLibrary(zstd_lib);
     }
 
-    main_mod.addImport("c", t.createModule());
+    const main_mod = b.createModule(.{
+        .root_source_file = b.path("src/main.zig"),
+        .target = target,
+        .optimize = optimize,
+        .strip = strip,
+        .link_libc = true,
+        .imports = &.{
+            .{ .name = "c", .module = t.mod },
+        },
+    });
 
     const build_options = b.addOptions();
     build_options.addOption([:0]const u8, "version", manifest.version);
