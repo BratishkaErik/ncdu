@@ -14,11 +14,19 @@ pub fn build(b: *std.Build) void {
     const pie = b.option(bool, "pie", "Build with PIE support (by default: target-dependant)");
     const strip = b.option(bool, "strip", "Strip debugging info (by default false)") orelse false;
 
-    const translate_c = b.dependency("translate_c", .{});
-    const t: Translator = .init(translate_c, .{
-        .c_source_file = b.path("src/c.h"),
+    const main_mod = b.createModule(.{
+        .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
+        .strip = strip,
+        .link_libc = true,
+    });
+
+    const t = b.addTranslateC(.{
+        .root_source_file = b.path("src/c.h"),
+        .target = target,
+        .optimize = optimize,
+        .link_libc = true,
     });
 
     const use_system_ncurses = b.systemIntegrationOption("ncurses", .{});
@@ -28,10 +36,10 @@ pub fn build(b: *std.Build) void {
         const ncurses_dep = b.lazyDependency("ncurses", .{}) orelse break :ncurses;
 
         const ncurses = buildNcurses(b, ncurses_dep, target.result, pie);
-        t.run.step.dependOn(&ncurses.step.step);
+        t.step.dependOn(&ncurses.step.step);
         t.addIncludePath(ncurses.inst_dir.path(b, "include/ncursesw"));
         t.addIncludePath(ncurses.inst_dir.path(b, "include"));
-        t.mod.addObjectFile(ncurses.inst_dir.path(b, "lib/libncursesw.a"));
+        main_mod.addObjectFile(ncurses.inst_dir.path(b, "lib/libncursesw.a"));
     }
 
     const use_system_zstd = b.systemIntegrationOption("zstd", .{});
@@ -56,19 +64,10 @@ pub fn build(b: *std.Build) void {
         }) orelse break :zstd;
         const zstd_lib = zstd_dep.artifact("zstd");
         t.addIncludePath(zstd_lib.getEmittedIncludeTree());
-        t.mod.linkLibrary(zstd_lib);
+        main_mod.linkLibrary(zstd_lib);
     }
 
-    const main_mod = b.createModule(.{
-        .root_source_file = b.path("src/main.zig"),
-        .target = target,
-        .optimize = optimize,
-        .strip = strip,
-        .link_libc = true,
-        .imports = &.{
-            .{ .name = "c", .module = t.mod },
-        },
-    });
+    main_mod.addImport("c", t.createModule());
 
     const build_options = b.addOptions();
     build_options.addOption([:0]const u8, "version", manifest.version);
