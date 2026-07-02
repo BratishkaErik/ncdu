@@ -49,7 +49,7 @@ pub const ItemKey = enum(u5) {
 
 // Pessimistic upper bound on the encoded size of an item, excluding the name field.
 // 2 bytes for map start/end, 11 per field (2 for the key, 9 for a full u64).
-const MAX_ITEM_LEN = 2 + 11 * @typeInfo(ItemKey).@"enum".fields.len;
+const MAX_ITEM_LEN = 2 + 11 * @typeInfo(ItemKey).@"enum".field_names.len;
 
 pub const CborMajor = enum(u3) { pos, neg, bytes, text, array, map, tag, simple };
 
