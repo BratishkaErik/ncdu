@@ -60,7 +60,7 @@ pub fn run(d: *model.Dir) void {
         .sink = &sink_threads[0],
         .stat = toStat(&d.entry),
     };
-    var buf: std.ArrayListUnmanaged(u8) = .empty;
+    var buf: std.ArrayList(u8) = .empty;
     d.fmtPath(main.allocator, true, &buf);
     const root = sink.createRoot(buf.items, &ctx.stat);
     buf.deinit(main.allocator);

@@ -136,7 +136,7 @@ pub fn delete() ?*model.Entry {
         if (it.* == entry)
             break;
 
-    var path: std.ArrayListUnmanaged(u8) = .empty;
+    var path: std.ArrayList(u8) = .empty;
     defer path.deinit(main.allocator);
     parent.fmtPath(main.allocator, true, &path);
     if (path.items.len == 0 or path.items[path.items.len-1] != '/')
@@ -197,7 +197,7 @@ fn drawConfirm() void {
 }
 
 fn drawProgress() void {
-    var path: std.ArrayListUnmanaged(u8) = .empty;
+    var path: std.ArrayList(u8) = .empty;
     defer path.deinit(main.allocator);
     parent.fmtPath(main.allocator, false, &path);
     path.append(main.allocator, '/') catch unreachable;
@@ -217,7 +217,7 @@ fn drawProgress() void {
 }
 
 fn drawErr() void {
-    var path: std.ArrayListUnmanaged(u8) = .empty;
+    var path: std.ArrayList(u8) = .empty;
     defer path.deinit(main.allocator);
     parent.fmtPath(main.allocator, false, &path);
     path.append(main.allocator, '/') catch unreachable;

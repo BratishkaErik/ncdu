@@ -184,7 +184,7 @@ const Args = struct {
             return self.next();
         }
         if (val[1] == '-') {
-            if (std.mem.indexOfScalar(u8, val, '=')) |sep| {
+            if (std.mem.findScalar(u8, val, '=')) |sep| {
                 if (sep == 2) try self.die("Invalid option '{s}'.\n", .{val});
                 self.last_arg = val[sep+1.. :0];
                 self.last = val[0..sep];
@@ -354,7 +354,7 @@ fn tryReadArgsFile(path: [:0]const u8) void {
             line = line[1..];
         }
         if (line.len == 0 or line[0] == '#') continue;
-        if (std.mem.indexOfAny(u8, line, " \t=")) |i| {
+        if (std.mem.findAny(u8, line, " \t=")) |i| {
             arglist[argc] = dupeZ(allocator, line[0..i]) catch unreachable;
             argc += 1;
             line = std.mem.trimStart(u8, line[i+1..], &std.ascii.whitespace);
@@ -507,11 +507,11 @@ pub fn main(init: std.process.Init.Minimal) void {
         tryReadArgsFile("/etc/ncdu.conf");
 
         if (env.getPosix("XDG_CONFIG_HOME")) |p| {
-            const path = std.fs.path.joinZ(allocator, &.{p, "ncdu", "config"}) catch unreachable;
+            const path = std.Io.Dir.path.joinZ(allocator, &.{p, "ncdu", "config"}) catch unreachable;
             defer allocator.free(path);
             tryReadArgsFile(path);
         } else if (env.getPosix("HOME")) |p| {
-            const path = std.fs.path.joinZ(allocator, &.{p, ".config", "ncdu", "config"}) catch unreachable;
+            const path = std.Io.Dir.path.joinZ(allocator, &.{p, ".config", "ncdu", "config"}) catch unreachable;
             defer allocator.free(path);
             tryReadArgsFile(path);
         }
@@ -594,7 +594,7 @@ pub fn main(init: std.process.Init.Minimal) void {
         if (config.binreader and (export_json != null or export_bin != null))
             bin_reader.import();
     } else {
-        var buf: [std.fs.max_path_bytes+1]u8 = @splat(0);
+        var buf: [std.Io.Dir.max_path_bytes+1]u8 = @splat(0);
         const path =
             if (shim.realpathZ(scan_dir orelse ".", buf[0..buf.len-1])) |p| buf[0..p.len:0]
             else |_| (scan_dir orelse ".");
@@ -614,7 +614,7 @@ pub fn main(init: std.process.Init.Minimal) void {
     while (true) {
         switch (state) {
             .refresh => {
-                var full_path: std.ArrayListUnmanaged(u8) = .empty;
+                var full_path: std.ArrayList(u8) = .empty;
                 defer full_path.deinit(allocator);
                 mem_sink.global.root.?.fmtPath(allocator, true, &full_path);
                 scan.scan(util.arrayListBufZ(&full_path, allocator)) catch {

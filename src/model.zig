@@ -109,7 +109,7 @@ pub const Entry = extern struct {
     fn alloc(comptime T: type, allocator: std.mem.Allocator, etype: EType, isext: bool, ename: []const u8) *Entry {
         const size = (if (isext) @as(usize, @sizeOf(Ext)) else 0) + @sizeOf(T) + ename.len + 1;
         var ptr = blk: while (true) {
-            const alignment = if (@typeInfo(@TypeOf(std.mem.Allocator.allocWithOptions)).@"fn".params[3].type == ?u29) 1 else std.mem.Alignment.@"1";
+            const alignment: std.mem.Alignment = .@"1";
             if (allocator.allocWithOptions(u8, size, alignment, null)) |p| break :blk p
             else |_| {}
             ui.oom();
@@ -218,9 +218,9 @@ pub const Dir = extern struct {
         suberr: bool = false,
     };
 
-    pub fn fmtPath(self: *const @This(), alloc: std.mem.Allocator, withRoot: bool, out: *std.ArrayListUnmanaged(u8)) void {
+    pub fn fmtPath(self: *const @This(), alloc: std.mem.Allocator, withRoot: bool, out: *std.ArrayList(u8)) void {
         if (!withRoot and self.parent == null) return;
-        var components: std.ArrayListUnmanaged([:0]const u8) = .empty;
+        var components: std.ArrayList([:0]const u8) = .empty;
         defer components.deinit(main.allocator);
         var it: ?*const @This() = self;
         while (it) |e| : (it = e.parent)
@@ -273,7 +273,7 @@ pub const Link = extern struct {
 
     // Return value should be freed with main.allocator.
     pub fn path(self: *const @This(), withRoot: bool) [:0]const u8 {
-        var out: std.ArrayListUnmanaged(u8) = .empty;
+        var out: std.ArrayList(u8) = .empty;
         self.parent.fmtPath(main.allocator, withRoot, &out);
         out.append(main.allocator, '/') catch unreachable;
         out.appendSlice(main.allocator, self.entry.name()) catch unreachable;
@@ -352,7 +352,7 @@ pub const Ext = extern struct {
 pub const devices = struct {
     var lock: std.Io.Mutex = .init;
     // id -> dev
-    pub var list: std.ArrayListUnmanaged(u64) = .empty;
+    pub var list: std.ArrayList(u64) = .empty;
     // dev -> id
     var lookup = std.AutoHashMap(u64, DevId).init(main.allocator);
 

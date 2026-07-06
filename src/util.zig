@@ -34,7 +34,7 @@ pub fn blocksToSize(b: u64) u64 {
 // Ensure the given arraylist buffer gets zero-terminated and returns a slice
 // into the buffer. The returned buffer is invalidated whenever the arraylist
 // is freed or written to.
-pub fn arrayListBufZ(buf: *std.ArrayListUnmanaged(u8), alloc: std.mem.Allocator) [:0]const u8 {
+pub fn arrayListBufZ(buf: *std.ArrayList(u8), alloc: std.mem.Allocator) [:0]const u8 {
     buf.append(alloc, 0) catch unreachable;
     defer buf.items.len -= 1;
     return buf.items[0..buf.items.len-1:0];
@@ -178,7 +178,7 @@ test "strnatcmp" {
 pub fn expanduser(path: []const u8, alloc: std.mem.Allocator) ![:0]u8 {
     if (path.len == 0 or path[0] != '~') return dupeZ(alloc, path);
 
-    const len = std.mem.indexOfScalar(u8, path, '/') orelse path.len;
+    const len = std.mem.findScalar(u8, path, '/') orelse path.len;
     const home_raw = blk: {
         const pwd = pwd: {
             if (len == 1) {

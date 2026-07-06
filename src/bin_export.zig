@@ -11,7 +11,7 @@ const c = @import("c");
 
 pub const global = struct {
     var fd: std.Io.File = undefined;
-    var index: std.ArrayListUnmanaged(u8) = .empty;
+    var index: std.ArrayList(u8) = .empty;
     var file_off: u64 = 0;
     var lock: std.Io.Mutex = .init;
     var root_itemref: u64 = 0;
@@ -105,8 +105,8 @@ pub const Thread = struct {
         }
     }
 
-    fn createBlock(t: *Thread) std.ArrayListUnmanaged(u8) {
-        var out: std.ArrayListUnmanaged(u8) = .empty;
+    fn createBlock(t: *Thread) std.ArrayList(u8) {
+        var out: std.ArrayList(u8) = .empty;
         if (t.block_num == std.math.maxInt(u32) or t.off == 0) return out;
 
         out.ensureTotalCapacityPrecise(main.allocator, 12 + @as(usize, @intCast(c.ZSTD_COMPRESSBOUND(@as(c_int, @intCast(t.off)))))) catch unreachable;

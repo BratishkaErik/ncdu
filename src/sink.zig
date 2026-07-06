@@ -90,7 +90,7 @@ pub const Dir = struct {
             defer global.last_error_lock.unlock(main.io);
             if (global.last_error) |p| main.allocator.free(p);
             const p = d.path();
-            global.last_error = std.fs.path.joinZ(main.allocator, &.{ p, name }) catch unreachable;
+            global.last_error = std.Io.Dir.path.joinZ(main.allocator, &.{ p, name }) catch unreachable;
             main.allocator.free(p);
         }
     }
@@ -140,12 +140,12 @@ pub const Dir = struct {
     }
 
     fn path(d: *Dir) [:0]u8 {
-        var components: std.ArrayListUnmanaged([]const u8) = .empty;
+        var components: std.ArrayList([]const u8) = .empty;
         defer components.deinit(main.allocator);
         var it: ?*Dir = d;
         while (it) |e| : (it = e.parent) components.append(main.allocator, e.name) catch unreachable;
 
-        var out: std.ArrayListUnmanaged(u8) = .empty;
+        var out: std.ArrayList(u8) = .empty;
         var i: usize = components.items.len-1;
         while (true) {
             if (i != components.items.len-1 and !(out.items.len != 0 and out.items[out.items.len-1] == '/'))

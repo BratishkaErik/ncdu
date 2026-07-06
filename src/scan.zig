@@ -243,7 +243,7 @@ const Thread = struct {
     thread_num: usize,
     sink: *sink.Thread,
     state: *State,
-    stack: std.ArrayListUnmanaged(*Dir) = .empty,
+    stack: std.ArrayList(*Dir) = .empty,
     thread: std.Io.Future(void) = undefined,
     namebuf: [4096]u8 = undefined,
 

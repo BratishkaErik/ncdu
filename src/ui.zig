@@ -89,7 +89,7 @@ pub fn errorString(e: anyerror) [:0]const u8 {
     };
 }
 
-var to_utf8_buf: std.ArrayListUnmanaged(u8) = .empty;
+var to_utf8_buf: std.ArrayList(u8) = .empty;
 
 fn toUtf8BadChar(ch: u8) bool {
     return switch (ch) {
@@ -128,7 +128,7 @@ pub fn toUtf8(in: [:0]const u8) [:0]const u8 {
     return util.arrayListBufZ(&to_utf8_buf, main.allocator);
 }
 
-var shorten_buf: std.ArrayListUnmanaged(u8) = .empty;
+var shorten_buf: std.ArrayList(u8) = .empty;
 
 // Shorten the given string to fit in the given number of columns.
 // If the string is too long, only the prefix and suffix will be printed, with '...' in between.

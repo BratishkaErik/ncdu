@@ -61,7 +61,7 @@ const Pattern = struct {
         const top = main.allocator.create(Pattern) catch unreachable;
         var tail = top;
         tail.sub = null;
-        while (std.mem.indexOfScalar(u8, pat, '/')) |idx| {
+        while (std.mem.findScalar(u8, pat, '/')) |idx| {
             tail.pattern = dupeZ(main.allocator, pat[0..idx]) catch unreachable;
             tail.isdir = true;
             tail.isliteral = isLiteral(tail.pattern);
@@ -125,7 +125,7 @@ test "parse" {
 fn PatternList(comptime withsub: bool) type {
     return struct {
         literals: std.HashMapUnmanaged(*const Pattern, Val, Ctx, 80) = .{},
-        wild: std.ArrayListUnmanaged(*const Pattern) = .empty,
+        wild: std.ArrayList(*const Pattern) = .empty,
 
         // Not a fan of the map-of-arrays approach in the 'withsub' case, it
         // has a lot of extra allocations. Linking the Patterns together in a
@@ -133,7 +133,7 @@ fn PatternList(comptime withsub: bool) type {
         // turn prevents multithreaded scanning. An alternative would be a
         // sorted array + binary search, but that slows down lookups. Perhaps a
         // custom hashmap with support for duplicate keys?
-        const Val = if (withsub) std.ArrayListUnmanaged(*const Pattern) else void;
+        const Val = if (withsub) std.ArrayList(*const Pattern) else void;
 
         const Ctx = struct {
             pub fn hash(_: Ctx, p: *const Pattern) u64 {
@@ -251,7 +251,7 @@ pub fn getPatterns(path_: []const u8) Patterns {
     if (path.len == 0) return root;
     var pat = root;
     defer pat.deinit();
-    while (std.mem.indexOfScalar(u8, path, '/')) |idx| {
+    while (std.mem.findScalar(u8, path, '/')) |idx| {
         const name = dupeZ(main.allocator, path[0..idx]) catch unreachable;
         defer main.allocator.free(name);
         path = path[idx+1..];

@@ -117,7 +117,7 @@ fn lseek_CUR_get(fd: fd_t) !u64 {
 
 const mem = std.mem;
 const E = std.posix.E;
-const max_path_bytes = std.fs.max_path_bytes;
+const max_path_bytes = std.Io.Dir.max_path_bytes;
 
 /// Same as `realpath` except `pathname` is WTF16LE-encoded.
 ///
