@@ -204,7 +204,7 @@ fn enterSub(e: *model.Dir) void {
             return;
         };
         dir_parent.entry.destroy(main.allocator);
-        dir_parent = bin_reader.get(ref, main.allocator).dir() orelse unreachable;
+        dir_parent = bin_reader.get(ref, main.allocator).dir().?;
         dir_parents.append(main.allocator, .{ .ref = ref }) catch unreachable;
     } else {
         dir_parent = e;
@@ -223,11 +223,11 @@ fn enterParent() void {
     const p = dir_parents.items[dir_parents.items.len-1];
     if (main.config.binreader) {
         dir_parent.entry.destroy(main.allocator);
-        dir_parent = bin_reader.get(p.ref, main.allocator).dir() orelse unreachable;
+        dir_parent = bin_reader.get(p.ref, main.allocator).dir().?;
     } else
-        dir_parent = p.ptr.?.dir() orelse unreachable;
+        dir_parent = p.ptr.?.dir().?;
 
-    const newpath = dupeZ(main.allocator, std.Io.Dir.path.dirname(dir_path) orelse unreachable) catch unreachable;
+    const newpath = dupeZ(main.allocator, std.Io.Dir.path.dirname(dir_path).?) catch unreachable;
     main.allocator.free(dir_path);
     dir_path = newpath;
 }
