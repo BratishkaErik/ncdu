@@ -9,7 +9,6 @@ const mem_sink = @import("mem_sink.zig");
 const json_export = @import("json_export.zig");
 const bin_export = @import("bin_export.zig");
 const ui = @import("ui.zig");
-const util = @import("util.zig");
 
 // Terminology note:
 // "source" is where scan results come from, these are scan.zig, mem_src.zig
@@ -439,12 +438,6 @@ fn drawError() void {
 }
 
 
-fn drawMessage(msg: []const u8) void {
-    const width = ui.cols -| 5;
-    const box = ui.Box.create(4, width, "Scan error");
-    box.move(2, 2);
-    ui.addstr(msg);
-}
 
 
 pub fn draw() void {

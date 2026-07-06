@@ -3,8 +3,6 @@
 
 const std = @import("std");
 const main = @import("main.zig");
-const util = @import("util.zig");
-const model = @import("model.zig");
 const sink = @import("sink.zig");
 const ui = @import("ui.zig");
 const c = @import("c");

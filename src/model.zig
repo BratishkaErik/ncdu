@@ -4,7 +4,6 @@
 const std = @import("std");
 const main = @import("main.zig");
 const ui = @import("ui.zig");
-const util = @import("util.zig");
 
 // Numbers are used in the binfmt export, so must be stable.
 pub const EType = enum(i3) {

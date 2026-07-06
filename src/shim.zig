@@ -9,7 +9,6 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const native_os = builtin.target.os.tag;
-const native_arch = builtin.target.cpu.arch;
 const errno = std.posix.errno;
 const system = std.posix.system;
 const SEEK = std.posix.SEEK;
