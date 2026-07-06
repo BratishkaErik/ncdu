@@ -10,7 +10,7 @@
     .minimum_zig_version = "0.16.0",
 
     .name = .ncdu,
-    .version = "2.10.1",
+    .version = "2.11.0-dev",
     .dependencies = .{
         .translate_c = .{
             .url = "https://codeberg.org/vancluever/translate-c/archive/119c5d0551c4b025d7a5d6963cf4dd32f9151a4b.tar.gz",
