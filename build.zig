@@ -20,7 +20,7 @@ pub fn build(b: *std.Build) void {
     var sys_libs: std.ArrayList(Translator.LinkSystemLib) = .empty;
     sys_libs.ensureUnusedCapacity(b.graph.arena, 2) catch @panic("OOM");
     if (use_system_ncurses) {
-        sys_libs.appendAssumeCapacity(.{ .name = "ncurses" });
+        sys_libs.appendAssumeCapacity(.{ .name = "ncursesw" });
     }
     if (use_system_zstd) {
         sys_libs.appendAssumeCapacity(.{ .name = "zstd" });

@@ -80,7 +80,7 @@ C version (1.x).
 
 ## Library Dependencies
 
-- ncurses
+- ncurses (with wide-character support)
 - libzstd
 
 Both libraries can be fetched and built automatically by Zig, or you can use
