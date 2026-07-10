@@ -78,11 +78,11 @@ pub fn statAt(parent: std.Io.Dir, name: [:0]const u8, follow: bool, symlink: ?*b
                             else if (stat.nlink > 1) .link
                             else if (!std.os.linux.S.ISREG(stat.mode)) .nonreg
                             else .reg,
-                        .blocks = @truncate(stat.blocks),
-                        .size = stat.size,
-                        .dev = stat.dev_major,
-                        .ino = stat.ino,
-                        .nlink = @truncate(stat.nlink),
+                        .blocks = clamp(sink.Stat, .blocks, stat.blocks),
+                        .size = clamp(sink.Stat, .size, stat.size),
+                        .dev = truncate(sink.Stat, .dev, stat.dev_major),
+                        .ino = truncate(sink.Stat, .ino, stat.ino),
+                        .nlink = clamp(sink.Stat, .nlink, stat.nlink),
                         .ext = .{
                             .pack = .{
                                 .hasmtime = true,
@@ -90,10 +90,10 @@ pub fn statAt(parent: std.Io.Dir, name: [:0]const u8, follow: bool, symlink: ?*b
                                 .hasgid = true,
                                 .hasmode = true,
                             },
-                            .mtime = @intCast(stat.mtime.sec),
-                            .uid = stat.uid,
-                            .gid = stat.gid,
-                            .mode = stat.mode,
+                            .mtime = clamp(model.Ext, .mtime, stat.mtime.sec),
+                            .uid = truncate(model.Ext, .uid, stat.uid),
+                            .gid = truncate(model.Ext, .gid, stat.gid),
+                            .mode = truncate(model.Ext, .mode, stat.mode),
                         }
                     };
                 },
