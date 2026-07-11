@@ -1,6 +1,10 @@
 # SPDX-FileCopyrightText: Yorhel <projects@yorhel.nl>
 # SPDX-License-Identifier: MIT
 
+# NOTE: Starting from version 2.10.0, release notes are published
+# on the GitHub Releases page:
+# https://github.com/BratishkaErik/ncdu/releases
+
 2.9.2 - 2025-10-24
 	- Still requires Zig 0.14 or 0.15
 	- Fix hang on loading config file when compiled with Zig 0.15.2
