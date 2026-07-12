@@ -1,5 +1,5 @@
 
-AC_INIT([ncdu],[1.22],[projects@yorhel.nl])
+AC_INIT([ncdu],[1.23.0],[projects@yorhel.nl])
 AC_CONFIG_SRCDIR([src/global.h])
 AC_CONFIG_HEADERS([config.h])
 AM_INIT_AUTOMAKE([foreign std-options subdir-objects])

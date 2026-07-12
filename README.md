@@ -1,4 +1,4 @@
-# ncdu 1.22
+# ncdu 1.23.0
 
 ## Project status
 
