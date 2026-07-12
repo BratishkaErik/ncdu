@@ -1,3 +1,7 @@
+# NOTE: Starting from version 1.23, release notes are published
+# on the GitHub Releases page:
+# https://github.com/BratishkaErik/ncdu/releases
+
 1.22 - 2025-03-05
 	- Add support for @-prefixed lines to ignore errors in config file (from 2.8)
 	- List all supported options in `--help` (from 2.8)
