@@ -136,7 +136,7 @@ static void browse_draw_flag(struct dir *n, int *x) {
 }
 
 
-const char *graph_styles[3][9] = {
+static const char *graph_styles[3][9] = {
   { " ", " ", " ", " ", " ", " ", " ", " ", "#" },
   { " ", " ", " ", " ", "▌", "▌", "▌", "▌", "█" },
   { " ", "▏", "▎", "▍", "▌", "▋", "▊", "▉", "█" },

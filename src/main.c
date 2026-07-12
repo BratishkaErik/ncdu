@@ -121,7 +121,7 @@ int input_handle(int wait) {
 
 /* This is a backport of the argument parser in the Zig version.
  * Minor differences in that this implementation can modify argv in-place and has a slightly different API. */
-struct argparser {
+static struct argparser {
   int argc;
   char **argv;
   char *shortopt;
