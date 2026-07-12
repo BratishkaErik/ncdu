@@ -1,5 +1,61 @@
 # ncdu 1.22
 
+## Project status
+
+### Background
+
+> [!IMPORTANT]
+> **This is a Maintenance Fork!**
+>
+> Following the [passing of Yoran Heling (aka Yorhel)](https://vndb.org/t24787),
+> the original author of Ncdu, this repository serves as a maintenance fork
+> to keep his project alive.
+>
+> See the [original upstream discussion](https://code.blicky.net/yorhel/ncdu/issues/276)
+> for more context.
+
+### Current maintainers
+
+*(Just me for now, but co-maintainers are very welcome)*
+
+I, BratishkaErik, have some experience
+[helping upstream](https://code.blicky.net/yorhel/ncdu/pulls?q=&type=pr&state=all&poster=387)
+update `ncdu` to newer Zig versions, so I will *(for now)* focus on keeping
+the Zig branch updated.
+
+I need to properly refresh my C knowledge and skills before I can comfortably
+maintain the C branch.
+
+If someone more qualified is willing to step up and lead the maintenance,
+I would be more than happy to assist and hand over this fork.
+
+### Git branches layout
+
+Original upstream branches are frozen to preserve and honor history.
+Active development has moved to new branches:
+
+* C version (1.x): `master` → `c-version`
+* Zig version (2.x): `zig` → `zig-version`
+
+### Future of the project
+
+Regarding the hosting: I chose GitHub to avoid the risk of losing the project
+if the upstream Forgejo instance goes down, and Codeberg can be quite laggy.
+
+Future releases will be tagged and published from the new branches.
+I will be writing new changelogs directly in GitHub Releases,
+instead of updating `ChangeLog` file.
+
+Please note that I do not have access to Yorhel's original PGP signing keys,
+and even if I had, using them IMO would not be appropriate anyway.
+
+I **won't** use my own personal PGP keys either, as tying verification
+to a single person *again* just creates another single point of failure.
+Instead, new releases will be signed and verified using Sigstore, with
+GitHub Attestations.
+
+---
+
 ## Description
 
 ncdu (NCurses Disk Usage) is a curses-based version of
