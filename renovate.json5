@@ -1,0 +1,22 @@
+// SPDX-FileCopyrightText: 2026 Eric Joldasov <bratishkaerik@landless-city.net>
+//
+// SPDX-License-Identifier: CC0-1.0
+
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:best-practices",
+    ":semanticCommitTypeAll(chore)"
+  ],
+  "minimumReleaseAge": "1 week",
+  "packageRules": [
+    {
+      "description": "Group Github Actions updates",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "groupName": "all GitHub Actions updates",
+      "groupSlug": "github-actions-all"
+    }
+  ]
+}
