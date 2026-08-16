@@ -80,7 +80,7 @@ pub fn statAt(parent: std.Io.Dir, name: [:0]const u8, follow: bool, symlink: ?*b
                             else .reg,
                         .blocks = clamp(sink.Stat, .blocks, stat.blocks),
                         .size = clamp(sink.Stat, .size, stat.size),
-                        .dev = truncate(sink.Stat, .dev, stat.dev_major),
+                        .dev = packDevId(stat.dev_major, stat.dev_minor),
                         .ino = truncate(sink.Stat, .ino, stat.ino),
                         .nlink = clamp(sink.Stat, .nlink, stat.nlink),
                         .ext = .{
@@ -144,6 +144,15 @@ pub fn statAt(parent: std.Io.Dir, name: [:0]const u8, follow: bool, symlink: ?*b
     }
 }
 
+fn packDevId(major: u32, minor: u32) u64 {
+    const major_ext = @as(u64, major);
+    const minor_ext = @as(u64, minor);
+
+    return ((major_ext & 0xfffff000) << 32) |
+        ((major_ext & 0x00000fff) << 8) |
+        ((minor_ext & 0xffffff00) << 12) |
+        (minor_ext & 0x000000ff);
+}
 
 fn isCacheDir(dir: std.Io.Dir) bool {
     const sig = "Signature: 8a477f597d28d172789f06886806bc55";
