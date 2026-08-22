@@ -33,7 +33,6 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
 
         .link_system_libs = sys_libs.items,
-        .libc_file = if (b.libc_file) |libc_file| .{ .cwd_relative = libc_file } else null,
     });
 
     const main_mod = b.createModule(.{
@@ -96,9 +95,7 @@ pub fn build(b: *std.Build) void {
 
     const run_cmd = b.addRunArtifact(exe);
     run_cmd.step.dependOn(b.getInstallStep());
-    if (b.args) |args| {
-        run_cmd.addArgs(args);
-    }
+    run_cmd.addPassthruArgs();
 
     const run_step = b.step("run", "Run the app");
     run_step.dependOn(&run_cmd.step);
@@ -174,7 +171,7 @@ fn buildNcurses(
     const run_config = std.Build.Step.Run.create(b, "configure fetched ncurses");
     run_config.setCwd(cwd);
     run_config.addFileArg(ncurses_dep.path("configure"));
-    const prefix_dir = run_config.addPrefixedOutputDirectoryArg("--prefix=", "inst");
+    const prefix_dir = run_config.addOutputDirectoryArg2("inst", .{ .prefix = "--prefix=", .make_absolute = true });
 
     run_config.addArgs(&.{
         // We need minimized and static build, so disable unneccessary stuff:
@@ -238,7 +235,7 @@ fn buildNcurses(
     run_make.setCwd(cwd);
     run_make.step.dependOn(&run_config.step);
 
-    const make_jobs = b.graph.max_jobs orelse 8;
+    const make_jobs = 8;
     run_make.addArgs(&.{ "make", b.fmt("-j{d}", .{make_jobs}), "install" });
 
     // Debugging:
