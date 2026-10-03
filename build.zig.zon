@@ -10,7 +10,7 @@
     .minimum_zig_version = "0.17.0",
 
     .name = .ncdu,
-    .version = "2.11.1",
+    .version = "2.12.0",
     .dependencies = .{
         .translate_c = .{
             .url = "https://codeberg.org/ziglang/translate-c/archive/2.0.0.tar.gz",
