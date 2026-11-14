@@ -6,6 +6,8 @@ workflows:
     '.github/workflows/reuse-lint.yml':
         - 'actions/checkout@v7.0.1'
         - 'fsfe/reuse-action@v6.0.0'
+    '.github/workflows/verify-lockfile.yml':
+        - 'actions/checkout@v7.0.1'
     '.github/workflows/zig-ci.yml':
         - 'actions/checkout@v7.0.1'
         - 'mlugg/setup-zig@v2.2.1'
