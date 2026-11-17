@@ -95,7 +95,7 @@ pub const config = struct {
     pub var scan_ui: ?enum { none, line, full } = null;
     pub var si: bool = false;
     pub var nc_tty: bool = false;
-    pub var ui_color: enum { off, dark2026, light2026, dark, darkbg } = .off;
+    pub var ui_color: enum { off, dark2026, light2026, dark, darkbg } = .dark2026;
     pub var thousands_sep: []const u8 = ",";
 
     pub var show_hidden: bool = true;
