@@ -505,6 +505,10 @@ pub fn main(init: std.process.Init.Minimal) void {
         break :blk true;
     };
 
+    if (env.getPosix("NO_COLOR")) |v| {
+        if (v.len > 0) config.ui_color = .off;
+    }
+
     if (loadConf) {
         tryReadArgsFile("/etc/ncdu.conf");
 
