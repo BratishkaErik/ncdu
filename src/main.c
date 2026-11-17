@@ -290,6 +290,8 @@ static int arg_option(int infile) {
     arg = ARG;
     if (!arg) return 1;
     else if(strcmp(arg, "off") == 0) uic_theme = 0;
+    else if(strcmp(arg, "dark-2026") == 0) uic_theme = 3;
+    else if(strcmp(arg, "light-2026") == 0) uic_theme = 4;
     else if(strcmp(arg, "dark") == 0) uic_theme = 1;
     else if(strcmp(arg, "dark-bg") == 0) uic_theme = 2;
     else if (!argparser_state.ignerror) die("Unknown --color option: %s\n", arg);
@@ -343,7 +345,7 @@ static void arg_help(void) {
   "  --group-directories-first  Sort directories before files\n"
   "  --confirm-quit             Ask confirmation before quitting ncdu\n"
   "  --no-confirm-delete        Don't ask confirmation before deletion\n"
-  "  --color SCHEME             off / dark / dark-bg\n"
+  "  --color SCHEME             off / dark-2026 / light-2026 / dark / dark-bg\n"
   "\n"
   "Refer to `man ncdu` for more information.\n");
   exit(0);
@@ -516,7 +518,11 @@ void close_nc(void) {
 
 
 int main(int argc, char **argv) {
+  const char *no_color;
+
   read_locale();
+  if((no_color = getenv("NO_COLOR")) != NULL && no_color[0] != '\0')
+    uic_theme = 0;
   config_load(argc, argv);
   argv_parse(argc, argv);
 

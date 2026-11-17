@@ -36,7 +36,7 @@
 #include <locale.h>
 #endif
 
-int uic_theme = 0;
+int uic_theme = 3;
 int winrows, wincols;
 int subwinr, subwinc;
 static char thou_sep;
@@ -250,42 +250,142 @@ void nctab(int c, int sel, int num, const char *str) {
 }
 
 
-static int colors[] = {
-#define C(name, ...) 0,
-  UI_COLORS
-#undef C
-  0
-};
+static int colors[UIC_NONE + 1];
 static int lastcolor = 0;
 
-
-static const struct {
+struct base_attr {
   short fg, bg;
   int attr;
-} color_defs[] = {
-#define COLOR__ -1
-#define B A_BOLD
-#define R A_REVERSE
-#define C(name, off_fg, off_bg, off_a, dark_fg, dark_bg, dark_a, darkbg_fg, darkbg_bg, darkbg_a) \
-  {COLOR_##off_fg,    COLOR_##off_bg,    off_a}, \
-  {COLOR_##dark_fg,   COLOR_##dark_bg,   dark_a}, \
-  {COLOR_##darkbg_fg, COLOR_##darkbg_bg, darkbg_a},
-  UI_COLORS
-#undef B
-#undef R
-#undef C
-  {0,0,0}
 };
 
+struct style_attr {
+  short fg, bg;
+  int attr;
+  const struct base_attr *fallback;
+};
+
+struct style_def {
+  struct style_attr off;
+  struct style_attr dark;
+  struct style_attr darkbg;
+  struct style_attr dark2026;
+  struct style_attr light2026;
+};
+
+static const struct style_def styles[UIC_NONE] = {
+  [UIC_DEFAULT] = {
+    .off       = { -1,            -1,          0                },
+    .dark      = { -1,            -1,          0                },
+    .darkbg    = { COLOR_WHITE,   COLOR_BLACK, 0                },
+    .dark2026  = { -1,            -1,          0                },
+    .light2026 = { -1,            -1,          0                } },
+  [UIC_BOX_TITLE] = {
+    .off       = { -1,            -1,          A_BOLD           },
+    .dark      = { COLOR_BLUE,    -1,          A_BOLD           },
+    .darkbg    = { COLOR_BLUE,    COLOR_BLACK, A_BOLD           },
+    .dark2026  = { 111,           -1,          A_BOLD, &(const struct base_attr){ COLOR_BLUE,    -1,          A_BOLD           } },
+    .light2026 = { 24,            -1,          A_BOLD, &(const struct base_attr){ COLOR_BLUE,    -1,          A_BOLD           } } },
+  [UIC_HD] = {
+    .off       = { -1,            -1,          A_REVERSE        },
+    .dark      = { COLOR_BLACK,   COLOR_CYAN,  0                },
+    .darkbg    = { COLOR_BLACK,   COLOR_CYAN,  0                },
+    .dark2026  = { 254,           236,         0,      &(const struct base_attr){ COLOR_BLACK,   COLOR_CYAN,  0                } },
+    .light2026 = { 235,           253,         0,      &(const struct base_attr){ -1,            -1,          A_REVERSE        } } },
+  [UIC_SEL] = {
+    .off       = { -1,            -1,          A_REVERSE        },
+    .dark      = { COLOR_WHITE,   COLOR_GREEN, A_BOLD           },
+    .darkbg    = { COLOR_WHITE,   COLOR_GREEN, A_BOLD           },
+    .dark2026  = { 255,           23,          A_BOLD, &(const struct base_attr){ COLOR_WHITE,   COLOR_GREEN, A_BOLD           } },
+    .light2026 = { 232,           152,         A_BOLD, &(const struct base_attr){ COLOR_BLACK,   COLOR_CYAN,  A_BOLD           } } },
+  [UIC_NUM] = {
+    .off       = { -1,            -1,          0                },
+    .dark      = { COLOR_YELLOW,  -1,          A_BOLD           },
+    .darkbg    = { COLOR_YELLOW,  COLOR_BLACK, A_BOLD           },
+    .dark2026  = { 221,           -1,          A_BOLD, &(const struct base_attr){ COLOR_YELLOW,  -1,          A_BOLD           } },
+    .light2026 = { 130,           -1,          A_BOLD, &(const struct base_attr){ -1,            -1,          A_BOLD           } } },
+  [UIC_NUM_HD] = {
+    .off       = { -1,            -1,          A_REVERSE        },
+    .dark      = { COLOR_YELLOW,  COLOR_CYAN,  A_BOLD           },
+    .darkbg    = { COLOR_YELLOW,  COLOR_CYAN,  A_BOLD           },
+    .dark2026  = { 221,           236,         A_BOLD, &(const struct base_attr){ COLOR_BLACK,   COLOR_CYAN,  A_BOLD           } },
+    .light2026 = { 130,           253,         A_BOLD, &(const struct base_attr){ -1,            -1,          A_BOLD|A_REVERSE } } },
+  [UIC_NUM_SEL] = {
+    .off       = { -1,            -1,          A_REVERSE        },
+    .dark      = { COLOR_YELLOW,  COLOR_GREEN, A_BOLD           },
+    .darkbg    = { COLOR_YELLOW,  COLOR_GREEN, A_BOLD           },
+    .dark2026  = { 222,           23,          A_BOLD, &(const struct base_attr){ COLOR_WHITE,   COLOR_GREEN, A_BOLD           } },
+    .light2026 = { 94,            152,         A_BOLD, &(const struct base_attr){ COLOR_BLACK,   COLOR_CYAN,  A_BOLD           } } },
+  [UIC_KEY] = {
+    .off       = { -1,            -1,          A_BOLD           },
+    .dark      = { COLOR_YELLOW,  -1,          A_BOLD           },
+    .darkbg    = { COLOR_YELLOW,  COLOR_BLACK, A_BOLD           },
+    .dark2026  = { 221,           -1,          A_BOLD, &(const struct base_attr){ COLOR_YELLOW,  -1,          A_BOLD           } },
+    .light2026 = { 130,           -1,          A_BOLD, &(const struct base_attr){ -1,            -1,          A_BOLD           } } },
+  [UIC_KEY_HD] = {
+    .off       = { -1,            -1,          A_BOLD|A_REVERSE },
+    .dark      = { COLOR_YELLOW,  COLOR_CYAN,  A_BOLD           },
+    .darkbg    = { COLOR_YELLOW,  COLOR_CYAN,  A_BOLD           },
+    .dark2026  = { 221,           236,         A_BOLD, &(const struct base_attr){ COLOR_BLACK,   COLOR_CYAN,  A_BOLD           } },
+    .light2026 = { 130,           253,         A_BOLD, &(const struct base_attr){ -1,            -1,          A_BOLD|A_REVERSE } } },
+  [UIC_DIR] = {
+    .off       = { -1,            -1,          0                },
+    .dark      = { COLOR_BLUE,    -1,          A_BOLD           },
+    .darkbg    = { COLOR_BLUE,    COLOR_BLACK, A_BOLD           },
+    .dark2026  = { 111,           -1,          A_BOLD, &(const struct base_attr){ COLOR_BLUE,    -1,          A_BOLD           } },
+    .light2026 = { 24,            -1,          A_BOLD, &(const struct base_attr){ COLOR_BLUE,    -1,          A_BOLD           } } },
+  [UIC_DIR_SEL] = {
+    .off       = { -1,            -1,          A_REVERSE        },
+    .dark      = { COLOR_BLUE,    COLOR_GREEN, A_BOLD           },
+    .darkbg    = { COLOR_BLUE,    COLOR_GREEN, A_BOLD           },
+    .dark2026  = { 153,           23,          A_BOLD, &(const struct base_attr){ COLOR_WHITE,   COLOR_GREEN, A_BOLD           } },
+    .light2026 = { 24,            152,         A_BOLD, &(const struct base_attr){ COLOR_BLACK,   COLOR_CYAN,  A_BOLD           } } },
+  [UIC_FLAG] = {
+    .off       = { -1,            -1,          0                },
+    .dark      = { COLOR_RED,     -1,          0                },
+    .darkbg    = { COLOR_RED,     COLOR_BLACK, 0                },
+    .dark2026  = { 203,           -1,          0,      &(const struct base_attr){ COLOR_RED,     -1,          0                } },
+    .light2026 = { 160,           -1,          0,      &(const struct base_attr){ COLOR_RED,     -1,          0                } } },
+  [UIC_FLAG_SEL] = {
+    .off       = { -1,            -1,          A_REVERSE        },
+    .dark      = { COLOR_RED,     COLOR_GREEN, 0                },
+    .darkbg    = { COLOR_RED,     COLOR_GREEN, 0                },
+    .dark2026  = { 210,           23,          A_BOLD, &(const struct base_attr){ COLOR_WHITE,   COLOR_GREEN, A_BOLD           } },
+    .light2026 = { 124,           152,         A_BOLD, &(const struct base_attr){ COLOR_BLACK,   COLOR_CYAN,  A_BOLD           } } },
+  [UIC_GRAPH] = {
+    .off       = { -1,            -1,          0                },
+    .dark      = { COLOR_MAGENTA, -1,          0                },
+    .darkbg    = { COLOR_MAGENTA, COLOR_BLACK, 0                },
+    .dark2026  = { 141,           -1,          0,      &(const struct base_attr){ COLOR_MAGENTA, -1,          0                } },
+    .light2026 = { 90,            -1,          0,      &(const struct base_attr){ COLOR_MAGENTA, -1,          0                } } },
+  [UIC_GRAPH_SEL] = {
+    .off       = { -1,            -1,          A_REVERSE        },
+    .dark      = { COLOR_MAGENTA, COLOR_GREEN, 0                },
+    .darkbg    = { COLOR_MAGENTA, COLOR_GREEN, 0                },
+    .dark2026  = { 183,           23,          0,      &(const struct base_attr){ COLOR_WHITE,   COLOR_GREEN, 0                } },
+    .light2026 = { 90,            152,         0,      &(const struct base_attr){ COLOR_BLACK,   COLOR_CYAN,  0                } } }
+};
+
+static struct base_attr style_resolve(const struct style_attr *s, int use_256) {
+  if(!use_256 && s->fallback)
+    return *s->fallback;
+  return (struct base_attr){ s->fg, s->bg, s->attr };
+}
+
 void uic_init(void) {
-  size_t i, j;
+  int i, use_256;
 
   start_color();
   use_default_colors();
-  for(i=0; i<sizeof(colors)/sizeof(*colors)-1; i++) {
-    j = i*3 + uic_theme;
-    init_pair(i+1, color_defs[j].fg, color_defs[j].bg);
-    colors[i] = color_defs[j].attr | COLOR_PAIR(i+1);
+  use_256 = COLORS >= 256;
+  for(i=0; i<UIC_NONE; i++) {
+    const struct style_attr *s =
+      uic_theme == 1 ? &styles[i].dark :
+      uic_theme == 2 ? &styles[i].darkbg :
+      uic_theme == 3 ? &styles[i].dark2026 :
+      uic_theme == 4 ? &styles[i].light2026 : &styles[i].off;
+    struct base_attr a = style_resolve(s, use_256);
+    init_pair(i+1, a.fg, a.bg);
+    colors[i] = a.attr | COLOR_PAIR(i+1);
   }
 }
 
