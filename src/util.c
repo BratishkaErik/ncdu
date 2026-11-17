@@ -253,9 +253,15 @@ void nctab(int c, int sel, int num, const char *str) {
 static int colors[UIC_NONE + 1];
 static int lastcolor = 0;
 
+struct base_attr {
+  short fg, bg;
+  int attr;
+};
+
 struct style_attr {
   short fg, bg;
   int attr;
+  const struct base_attr *fallback;
 };
 
 struct style_def {
@@ -327,17 +333,25 @@ static const struct style_def styles[UIC_NONE] = {
     .darkbg   = { COLOR_MAGENTA, COLOR_GREEN, 0                } }
 };
 
+static struct base_attr style_resolve(const struct style_attr *s, int use_256) {
+  if(!use_256 && s->fallback)
+    return *s->fallback;
+  return (struct base_attr){ s->fg, s->bg, s->attr };
+}
+
 void uic_init(void) {
-  int i;
+  int i, use_256;
 
   start_color();
   use_default_colors();
+  use_256 = COLORS >= 256;
   for(i=0; i<UIC_NONE; i++) {
-    const struct style_attr *a =
+    const struct style_attr *s =
       uic_theme == 1 ? &styles[i].dark :
       uic_theme == 2 ? &styles[i].darkbg : &styles[i].off;
-    init_pair(i+1, a->fg, a->bg);
-    colors[i] = a->attr | COLOR_PAIR(i+1);
+    struct base_attr a = style_resolve(s, use_256);
+    init_pair(i+1, a.fg, a.bg);
+    colors[i] = a.attr | COLOR_PAIR(i+1);
   }
 }
 
