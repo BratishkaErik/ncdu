@@ -250,42 +250,94 @@ void nctab(int c, int sel, int num, const char *str) {
 }
 
 
-static int colors[] = {
-#define C(name, ...) 0,
-  UI_COLORS
-#undef C
-  0
-};
+static int colors[UIC_NONE + 1];
 static int lastcolor = 0;
 
-
-static const struct {
+struct style_attr {
   short fg, bg;
   int attr;
-} color_defs[] = {
-#define COLOR__ -1
-#define B A_BOLD
-#define R A_REVERSE
-#define C(name, off_fg, off_bg, off_a, dark_fg, dark_bg, dark_a, darkbg_fg, darkbg_bg, darkbg_a) \
-  {COLOR_##off_fg,    COLOR_##off_bg,    off_a}, \
-  {COLOR_##dark_fg,   COLOR_##dark_bg,   dark_a}, \
-  {COLOR_##darkbg_fg, COLOR_##darkbg_bg, darkbg_a},
-  UI_COLORS
-#undef B
-#undef R
-#undef C
-  {0,0,0}
+};
+
+struct style_def {
+  struct style_attr off;
+  struct style_attr dark;
+  struct style_attr darkbg;
+};
+
+static const struct style_def styles[UIC_NONE] = {
+  [UIC_DEFAULT] = {
+    .off      = { -1,            -1,          0                },
+    .dark     = { -1,            -1,          0                },
+    .darkbg   = { COLOR_WHITE,   COLOR_BLACK, 0                } },
+  [UIC_BOX_TITLE] = {
+    .off      = { -1,            -1,          A_BOLD           },
+    .dark     = { COLOR_BLUE,    -1,          A_BOLD           },
+    .darkbg   = { COLOR_BLUE,    COLOR_BLACK, A_BOLD           } },
+  [UIC_HD] = {
+    .off      = { -1,            -1,          A_REVERSE        },
+    .dark     = { COLOR_BLACK,   COLOR_CYAN,  0                },
+    .darkbg   = { COLOR_BLACK,   COLOR_CYAN,  0                } },
+  [UIC_SEL] = {
+    .off      = { -1,            -1,          A_REVERSE        },
+    .dark     = { COLOR_WHITE,   COLOR_GREEN, A_BOLD           },
+    .darkbg   = { COLOR_WHITE,   COLOR_GREEN, A_BOLD           } },
+  [UIC_NUM] = {
+    .off      = { -1,            -1,          0                },
+    .dark     = { COLOR_YELLOW,  -1,          A_BOLD           },
+    .darkbg   = { COLOR_YELLOW,  COLOR_BLACK, A_BOLD           } },
+  [UIC_NUM_HD] = {
+    .off      = { -1,            -1,          A_REVERSE        },
+    .dark     = { COLOR_YELLOW,  COLOR_CYAN,  A_BOLD           },
+    .darkbg   = { COLOR_YELLOW,  COLOR_CYAN,  A_BOLD           } },
+  [UIC_NUM_SEL] = {
+    .off      = { -1,            -1,          A_REVERSE        },
+    .dark     = { COLOR_YELLOW,  COLOR_GREEN, A_BOLD           },
+    .darkbg   = { COLOR_YELLOW,  COLOR_GREEN, A_BOLD           } },
+  [UIC_KEY] = {
+    .off      = { -1,            -1,          A_BOLD           },
+    .dark     = { COLOR_YELLOW,  -1,          A_BOLD           },
+    .darkbg   = { COLOR_YELLOW,  COLOR_BLACK, A_BOLD           } },
+  [UIC_KEY_HD] = {
+    .off      = { -1,            -1,          A_BOLD|A_REVERSE },
+    .dark     = { COLOR_YELLOW,  COLOR_CYAN,  A_BOLD           },
+    .darkbg   = { COLOR_YELLOW,  COLOR_CYAN,  A_BOLD           } },
+  [UIC_DIR] = {
+    .off      = { -1,            -1,          0                },
+    .dark     = { COLOR_BLUE,    -1,          A_BOLD           },
+    .darkbg   = { COLOR_BLUE,    COLOR_BLACK, A_BOLD           } },
+  [UIC_DIR_SEL] = {
+    .off      = { -1,            -1,          A_REVERSE        },
+    .dark     = { COLOR_BLUE,    COLOR_GREEN, A_BOLD           },
+    .darkbg   = { COLOR_BLUE,    COLOR_GREEN, A_BOLD           } },
+  [UIC_FLAG] = {
+    .off      = { -1,            -1,          0                },
+    .dark     = { COLOR_RED,     -1,          0                },
+    .darkbg   = { COLOR_RED,     COLOR_BLACK, 0                } },
+  [UIC_FLAG_SEL] = {
+    .off      = { -1,            -1,          A_REVERSE        },
+    .dark     = { COLOR_RED,     COLOR_GREEN, 0                },
+    .darkbg   = { COLOR_RED,     COLOR_GREEN, 0                } },
+  [UIC_GRAPH] = {
+    .off      = { -1,            -1,          0                },
+    .dark     = { COLOR_MAGENTA, -1,          0                },
+    .darkbg   = { COLOR_MAGENTA, COLOR_BLACK, 0                } },
+  [UIC_GRAPH_SEL] = {
+    .off      = { -1,            -1,          A_REVERSE        },
+    .dark     = { COLOR_MAGENTA, COLOR_GREEN, 0                },
+    .darkbg   = { COLOR_MAGENTA, COLOR_GREEN, 0                } }
 };
 
 void uic_init(void) {
-  size_t i, j;
+  int i;
 
   start_color();
   use_default_colors();
-  for(i=0; i<sizeof(colors)/sizeof(*colors)-1; i++) {
-    j = i*3 + uic_theme;
-    init_pair(i+1, color_defs[j].fg, color_defs[j].bg);
-    colors[i] = color_defs[j].attr | COLOR_PAIR(i+1);
+  for(i=0; i<UIC_NONE; i++) {
+    const struct style_attr *a =
+      uic_theme == 1 ? &styles[i].dark :
+      uic_theme == 2 ? &styles[i].darkbg : &styles[i].off;
+    init_pair(i+1, a->fg, a->bg);
+    colors[i] = a->attr | COLOR_PAIR(i+1);
   }
 }
 

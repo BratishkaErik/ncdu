@@ -33,29 +33,22 @@
 void die(const char *, ...);
 
 
-/* UI colors: (foreground, background, attrs)
- *  NAME         OFF         DARK                DARK-BG   */
-#define UI_COLORS \
-  C(DEFAULT,     _,_,0  ,    _,      _,    0,    WHITE,  BLACK,0)\
-  C(BOX_TITLE,   _,_,B  ,    BLUE,   _,    B,    BLUE,   BLACK,B)\
-  C(HD,          _,_,R  ,    BLACK,  CYAN, 0,    BLACK,  CYAN, 0)    /* header & footer */\
-  C(SEL,         _,_,R  ,    WHITE,  GREEN,B,    WHITE,  GREEN,B)\
-  C(NUM,         _,_,0  ,    YELLOW, _,    B,    YELLOW, BLACK,B)\
-  C(NUM_HD,      _,_,R  ,    YELLOW, CYAN, B,    YELLOW, CYAN, B)\
-  C(NUM_SEL,     _,_,R  ,    YELLOW, GREEN,B,    YELLOW, GREEN,B)\
-  C(KEY,         _,_,B  ,    YELLOW, _,    B,    YELLOW, BLACK,B)\
-  C(KEY_HD,      _,_,B|R,    YELLOW, CYAN, B,    YELLOW, CYAN, B)\
-  C(DIR,         _,_,0  ,    BLUE,   _,    B,    BLUE,   BLACK,B)\
-  C(DIR_SEL,     _,_,R  ,    BLUE,   GREEN,B,    BLUE,   GREEN,B)\
-  C(FLAG,        _,_,0  ,    RED,    _,    0,    RED,    BLACK,0)\
-  C(FLAG_SEL,    _,_,R  ,    RED,    GREEN,0,    RED,    GREEN,0)\
-  C(GRAPH,       _,_,0  ,    MAGENTA,_,    0,    MAGENTA,BLACK,0)\
-  C(GRAPH_SEL,   _,_,R  ,    MAGENTA,GREEN,0,    MAGENTA,GREEN,0)
-
 enum ui_coltype {
-#define C(name, ...) UIC_##name,
-  UI_COLORS
-#undef C
+  UIC_DEFAULT,
+  UIC_BOX_TITLE,
+  UIC_HD,
+  UIC_SEL,
+  UIC_NUM,
+  UIC_NUM_HD,
+  UIC_NUM_SEL,
+  UIC_KEY,
+  UIC_KEY_HD,
+  UIC_DIR,
+  UIC_DIR_SEL,
+  UIC_FLAG,
+  UIC_FLAG_SEL,
+  UIC_GRAPH,
+  UIC_GRAPH_SEL,
   UIC_NONE
 };
 
