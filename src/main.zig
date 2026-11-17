@@ -95,7 +95,7 @@ pub const config = struct {
     pub var scan_ui: ?enum { none, line, full } = null;
     pub var si: bool = false;
     pub var nc_tty: bool = false;
-    pub var ui_color: enum { off, dark, darkbg } = .off;
+    pub var ui_color: enum { off, dark2026, dark, darkbg } = .off;
     pub var thousands_sep: []const u8 = ",";
 
     pub var show_hidden: bool = true;
@@ -319,6 +319,7 @@ fn argConfig(args: *Args, opt: Args.Option, infile: bool) !void {
     else if (opt.is("--color")) {
         const val = try args.arg();
         if (std.mem.eql(u8, val, "off")) config.ui_color = .off
+        else if (std.mem.eql(u8, val, "dark-2026")) config.ui_color = .dark2026
         else if (std.mem.eql(u8, val, "dark")) config.ui_color = .dark
         else if (std.mem.eql(u8, val, "dark-bg")) config.ui_color = .darkbg
         else try args.die("Unknown --color option: {s}.\n", .{val});
@@ -431,7 +432,7 @@ fn help() noreturn {
     \\  --confirm-quit             Ask confirmation before quitting ncdu
     \\  --no-confirm-delete        Don't ask confirmation before deletion
     \\  --delete-command CMD       Command to run for file deletion
-    \\  --color SCHEME             off / dark / dark-bg
+    \\  --color SCHEME             off / dark-2026 / dark / dark-bg
     \\
     \\Refer to `man ncdu` for more information.
     \\
