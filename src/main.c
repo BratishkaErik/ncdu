@@ -518,7 +518,11 @@ void close_nc(void) {
 
 
 int main(int argc, char **argv) {
+  const char *no_color;
+
   read_locale();
+  if((no_color = getenv("NO_COLOR")) != NULL && no_color[0] != '\0')
+    uic_theme = 0;
   config_load(argc, argv);
   argv_parse(argc, argv);
 
