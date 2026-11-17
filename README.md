@@ -69,7 +69,7 @@ available, but it is a useful tool even on regular desktop systems. Ncdu aims
 to be fast, simple and easy to use, and should be able to run in any minimal
 POSIX-like environment with ncurses installed.
 
-See the [ncdu 2 release announcement](https://dev.yorhel.nl/doc/ncdu2) for
+See the [ncdu 2 release announcement](https://ncdu.landless-city.net/blog/2021-07-22-ncdu2/) for
 information about the differences between this Zig implementation (2.x) and the
 C version (1.x).
 

@@ -775,7 +775,7 @@ const help = struct {
         box.move(7, 43); ui.addstr(main.program_version);
         ui.style(.default);
         box.move(9, 11); ui.addstr("Written by Yorhel <projects@yorhel.nl>");
-        box.move(10,16); ui.addstr("https://dev.yorhel.nl/ncdu");
+        box.move(10,15); ui.addstr("https://ncdu.landless-city.net");
     }
 
     fn draw() void {
