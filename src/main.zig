@@ -403,7 +403,7 @@ fn help() noreturn {
     \\  --exclude-caches           Exclude directories containing CACHEDIR.TAG
     \\  -L, --follow-symlinks      Follow symbolic links (excluding directories)
     \\  --exclude-kernfs           Exclude Linux pseudo filesystems (procfs,sysfs,cgroup,...)
-    \\  -t NUM                     Scan with NUM threads
+    \\  -t NUM                     Scan with NUM threads (0=auto, up to 16)
     \\
     \\Export options:
     \\  -c, --compress             Use Zstandard compression with `-o`
@@ -558,7 +558,7 @@ pub fn main(init: std.process.Init.Minimal) void {
         }
     }
 
-    if (config.threads == 0) config.threads = std.Thread.getCpuCount() catch 1;
+    if (config.threads == 0) config.threads = @min(std.Thread.getCpuCount() catch 1, 16);
 
     if (@import("builtin").os.tag != .linux and config.exclude_kernfs)
         ui.die("The --exclude-kernfs flag is currently only supported on Linux.\n", .{});
