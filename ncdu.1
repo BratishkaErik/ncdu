@@ -385,13 +385,15 @@ interactive mode to prompt before each deletion:
 .Dl ncdu --no-confirm-delete --delete-command \[aq]rm -ri --\[aq]
 Or to move files to trash:
 .Dl ncdu --delete-command \[aq]gio trash --\[aq]
-.It Fl \-color Ar off | dark-2026 | dark | dark-bg
+.It Fl \-color Ar off | dark-2026 | light-2026 | dark | dark-bg
 Set the color scheme.
 The following schemes are recognized:
 .Ar off
 to disable colors,
 .Ar dark\-2026
 for a 256-color scheme intended for dark backgrounds (with an 8-color fallback),
+.Ar light\-2026
+for a 256-color scheme intended for light backgrounds (with an 8-color fallback),
 .Ar dark
 for the legacy color scheme intended for dark backgrounds and
 .Ar dark\-bg
