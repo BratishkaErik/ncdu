@@ -207,7 +207,18 @@ test "shorten" {
     try t("ą́ą́ą́ą́ą́ą́", 5, "ą́...̨́ą́"); // Combining marks, similarly bad.
 }
 
-const StyleAttr = struct { fg: i16, bg: i16, attr: u32 };
+const BaseAttr = struct { fg: i16, bg: i16, attr: u32 };
+const StyleAttr = struct {
+    fg: i16,
+    bg: i16,
+    attr: u32,
+    fallback: ?BaseAttr = null,
+
+    fn resolve(self: @This(), use_256: bool) BaseAttr {
+        if (!use_256) if (self.fallback) |fb| return fb;
+        return .{ .fg = self.fg, .bg = self.bg, .attr = self.attr };
+    }
+};
 const StyleDef = struct {
     name: [:0]const u8,
     off: StyleAttr,
@@ -293,6 +304,22 @@ const styles = [_]StyleDef{
         .darkbg = .{ .fg = c.COLOR_MAGENTA, .bg = c.COLOR_GREEN,  .attr = 0 } },
 };
 
+comptime {
+    for (styles) |s| {
+        for (@typeInfo(@TypeOf(main.config.ui_color)).@"enum".field_names) |name| {
+            const a: StyleAttr = @field(s, name);
+            if ((a.fg > 7 or a.bg > 7) and a.fallback == null)
+                @compileError("256-color style '" ++ s.name ++ "." ++ name ++ "' must define a fallback");
+            if (a.fallback) |fb| {
+                if (fb.fg > 7 or fb.bg > 7)
+                    @compileError("Fallback for '" ++ s.name ++ "." ++ name ++ "' must use base 8 colors (-1..7)");
+            }
+        }
+    }
+}
+
+var style_attrs: [styles.len]u32 = undefined;
+
 pub const Style = lbl: {
     var names: [styles.len][]const u8 = undefined;
     var values: [styles.len]u8 = undefined;
@@ -364,7 +391,12 @@ pub fn init() void {
 
     _ = c.start_color();
     _ = c.use_default_colors();
-    for (styles, 0..) |s, i| _ = c.init_pair(@as(i16, @intCast(i+1)), s.style().fg, s.style().bg);
+    const use_256 = c.COLORS >= 256;
+    for (styles, &style_attrs, 1..) |s, *attr, pair| {
+        const a = s.style().resolve(use_256);
+        _ = c.init_pair(@intCast(pair), a.fg, a.bg);
+        attr.* = a.attr;
+    }
     _ = c.bkgd(@intCast(c.COLOR_PAIR(@intFromEnum(Style.default)+1)));
     inited = true;
 }
@@ -381,7 +413,7 @@ pub fn deinit() void {
 }
 
 pub fn style(s: Style) void {
-    _ = c.attr_set(styles[@intFromEnum(s)].style().attr, @intFromEnum(s)+1, null);
+    _ = c.attr_set(style_attrs[@intFromEnum(s)], @intFromEnum(s)+1, null);
 }
 
 pub fn move(y: u32, x: u32) void {
