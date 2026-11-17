@@ -207,91 +207,156 @@ test "shorten" {
     try t("ą́ą́ą́ą́ą́ą́", 5, "ą́...̨́ą́"); // Combining marks, similarly bad.
 }
 
-const StyleAttr = struct { fg: i16, bg: i16, attr: u32 };
+const BaseAttr = struct { fg: i16, bg: i16, attr: u32 };
+const StyleAttr = struct {
+    fg: i16,
+    bg: i16,
+    attr: u32,
+    fallback: ?BaseAttr = null,
+
+    fn resolve(self: @This(), use_256: bool) BaseAttr {
+        if (!use_256) if (self.fallback) |fb| return fb;
+        return .{ .fg = self.fg, .bg = self.bg, .attr = self.attr };
+    }
+};
 const StyleDef = struct {
     name: [:0]const u8,
     off: StyleAttr,
     dark: StyleAttr,
     darkbg: StyleAttr,
+    dark2026: StyleAttr,
+    light2026: StyleAttr,
     fn style(self: *const @This()) StyleAttr {
         return switch (main.config.ui_color) {
             .off => self.off,
             .dark => self.dark,
             .darkbg => self.darkbg,
+            .dark2026 => self.dark2026,
+            .light2026 => self.light2026,
         };
     }
 };
 
 const styles = [_]StyleDef{
-    .{  .name   = "default",
-        .off    = .{ .fg = -1,              .bg = -1,             .attr = 0 },
-        .dark   = .{ .fg = -1,              .bg = -1,             .attr = 0 },
-        .darkbg = .{ .fg = c.COLOR_WHITE,   .bg = c.COLOR_BLACK,  .attr = 0 } },
-    .{  .name   = "bold",
-        .off    = .{ .fg = -1,              .bg = -1,             .attr = c.A_BOLD },
-        .dark   = .{ .fg = -1,              .bg = -1,             .attr = c.A_BOLD },
-        .darkbg = .{ .fg = c.COLOR_WHITE,   .bg = c.COLOR_BLACK,  .attr = c.A_BOLD } },
-    .{  .name   = "bold_hd",
-        .off    = .{ .fg = -1,              .bg = -1,             .attr = c.A_BOLD|c.A_REVERSE },
-        .dark   = .{ .fg = c.COLOR_BLACK,   .bg = c.COLOR_CYAN,   .attr = c.A_BOLD },
-        .darkbg = .{ .fg = c.COLOR_BLACK,   .bg = c.COLOR_CYAN,   .attr = c.A_BOLD } },
-    .{  .name   = "box_title",
-        .off    = .{ .fg = -1,              .bg = -1,             .attr = c.A_BOLD },
-        .dark   = .{ .fg = c.COLOR_BLUE,    .bg = -1,             .attr = c.A_BOLD },
-        .darkbg = .{ .fg = c.COLOR_BLUE,    .bg = c.COLOR_BLACK,  .attr = c.A_BOLD } },
-    .{  .name   = "hd", // header + footer
-        .off    = .{ .fg = -1,              .bg = -1,             .attr = c.A_REVERSE },
-        .dark   = .{ .fg = c.COLOR_BLACK,   .bg = c.COLOR_CYAN,   .attr = 0 },
-        .darkbg = .{ .fg = c.COLOR_BLACK,   .bg = c.COLOR_CYAN,   .attr = 0 } },
-    .{  .name   = "sel",
-        .off    = .{ .fg = -1,              .bg = -1,             .attr = c.A_REVERSE },
-        .dark   = .{ .fg = c.COLOR_WHITE,   .bg = c.COLOR_GREEN,  .attr = c.A_BOLD },
-        .darkbg = .{ .fg = c.COLOR_WHITE,   .bg = c.COLOR_GREEN,  .attr = c.A_BOLD } },
-    .{  .name   = "num",
-        .off    = .{ .fg = -1,              .bg = -1,             .attr = 0 },
-        .dark   = .{ .fg = c.COLOR_YELLOW,  .bg = -1,             .attr = c.A_BOLD },
-        .darkbg = .{ .fg = c.COLOR_YELLOW,  .bg = c.COLOR_BLACK,  .attr = c.A_BOLD } },
-    .{  .name   = "num_hd",
-        .off    = .{ .fg = -1,              .bg = -1,             .attr = c.A_REVERSE },
-        .dark   = .{ .fg = c.COLOR_YELLOW,  .bg = c.COLOR_CYAN,   .attr = c.A_BOLD },
-        .darkbg = .{ .fg = c.COLOR_YELLOW,  .bg = c.COLOR_CYAN,   .attr = c.A_BOLD } },
-    .{  .name   = "num_sel",
-        .off    = .{ .fg = -1,              .bg = -1,             .attr = c.A_REVERSE },
-        .dark   = .{ .fg = c.COLOR_YELLOW,  .bg = c.COLOR_GREEN,  .attr = c.A_BOLD },
-        .darkbg = .{ .fg = c.COLOR_YELLOW,  .bg = c.COLOR_GREEN,  .attr = c.A_BOLD } },
-    .{  .name   = "key",
-        .off    = .{ .fg = -1,              .bg = -1,             .attr = c.A_BOLD },
-        .dark   = .{ .fg = c.COLOR_YELLOW,  .bg = -1,             .attr = c.A_BOLD },
-        .darkbg = .{ .fg = c.COLOR_YELLOW,  .bg = c.COLOR_BLACK,  .attr = c.A_BOLD } },
-    .{  .name   = "key_hd",
-        .off    = .{ .fg = -1,              .bg = -1,             .attr = c.A_BOLD|c.A_REVERSE },
-        .dark   = .{ .fg = c.COLOR_YELLOW,  .bg = c.COLOR_CYAN,   .attr = c.A_BOLD },
-        .darkbg = .{ .fg = c.COLOR_YELLOW,  .bg = c.COLOR_CYAN,   .attr = c.A_BOLD } },
-    .{  .name   = "dir",
-        .off    = .{ .fg = -1,              .bg = -1,             .attr = 0 },
-        .dark   = .{ .fg = c.COLOR_BLUE,    .bg = -1,             .attr = c.A_BOLD },
-        .darkbg = .{ .fg = c.COLOR_BLUE,    .bg = c.COLOR_BLACK,  .attr = c.A_BOLD } },
-    .{  .name   = "dir_sel",
-        .off    = .{ .fg = -1,              .bg = -1,             .attr = c.A_REVERSE },
-        .dark   = .{ .fg = c.COLOR_BLUE,    .bg = c.COLOR_GREEN,  .attr = c.A_BOLD },
-        .darkbg = .{ .fg = c.COLOR_BLUE,    .bg = c.COLOR_GREEN,  .attr = c.A_BOLD } },
-    .{  .name   = "flag",
-        .off    = .{ .fg = -1,              .bg = -1,             .attr = 0 },
-        .dark   = .{ .fg = c.COLOR_RED,     .bg = -1,             .attr = 0 },
-        .darkbg = .{ .fg = c.COLOR_RED,     .bg = c.COLOR_BLACK,  .attr = 0 } },
-    .{  .name   = "flag_sel",
-        .off    = .{ .fg = -1,              .bg = -1,             .attr = c.A_REVERSE },
-        .dark   = .{ .fg = c.COLOR_RED,     .bg = c.COLOR_GREEN,  .attr = 0 },
-        .darkbg = .{ .fg = c.COLOR_RED,     .bg = c.COLOR_GREEN,  .attr = 0 } },
-    .{  .name   = "graph",
-        .off    = .{ .fg = -1,              .bg = -1,             .attr = 0 },
-        .dark   = .{ .fg = c.COLOR_MAGENTA, .bg = -1,             .attr = 0 },
-        .darkbg = .{ .fg = c.COLOR_MAGENTA, .bg = c.COLOR_BLACK,  .attr = 0 } },
-    .{  .name   = "graph_sel",
-        .off    = .{ .fg = -1,              .bg = -1,             .attr = c.A_REVERSE },
-        .dark   = .{ .fg = c.COLOR_MAGENTA, .bg = c.COLOR_GREEN,  .attr = 0 },
-        .darkbg = .{ .fg = c.COLOR_MAGENTA, .bg = c.COLOR_GREEN,  .attr = 0 } },
+    .{  .name      = "default",
+        .off       = .{ .fg = -1,              .bg = -1,             .attr = 0 },
+        .dark      = .{ .fg = -1,              .bg = -1,             .attr = 0 },
+        .darkbg    = .{ .fg = c.COLOR_WHITE,   .bg = c.COLOR_BLACK,  .attr = 0 },
+        .dark2026  = .{ .fg = -1,              .bg = -1,             .attr = 0 },
+        .light2026 = .{ .fg = -1,              .bg = -1,             .attr = 0 } },
+    .{  .name      = "bold",
+        .off       = .{ .fg = -1,              .bg = -1,             .attr = c.A_BOLD },
+        .dark      = .{ .fg = -1,              .bg = -1,             .attr = c.A_BOLD },
+        .darkbg    = .{ .fg = c.COLOR_WHITE,   .bg = c.COLOR_BLACK,  .attr = c.A_BOLD },
+        .dark2026  = .{ .fg = -1,              .bg = -1,             .attr = c.A_BOLD },
+        .light2026 = .{ .fg = -1,              .bg = -1,             .attr = c.A_BOLD } },
+    .{  .name      = "bold_hd",
+        .off       = .{ .fg = -1,              .bg = -1,             .attr = c.A_BOLD|c.A_REVERSE },
+        .dark      = .{ .fg = c.COLOR_BLACK,   .bg = c.COLOR_CYAN,   .attr = c.A_BOLD },
+        .darkbg    = .{ .fg = c.COLOR_BLACK,   .bg = c.COLOR_CYAN,   .attr = c.A_BOLD },
+        .dark2026  = .{ .fg = 255,             .bg = 236,            .attr = c.A_BOLD, .fallback = .{ .fg = c.COLOR_BLACK, .bg = c.COLOR_CYAN,  .attr = c.A_BOLD } },
+        .light2026 = .{ .fg = 232,             .bg = 253,            .attr = c.A_BOLD, .fallback = .{ .fg = -1,            .bg = -1,            .attr = c.A_BOLD|c.A_REVERSE } } },
+    .{  .name      = "box_title",
+        .off       = .{ .fg = -1,              .bg = -1,             .attr = c.A_BOLD },
+        .dark      = .{ .fg = c.COLOR_BLUE,    .bg = -1,             .attr = c.A_BOLD },
+        .darkbg    = .{ .fg = c.COLOR_BLUE,    .bg = c.COLOR_BLACK,  .attr = c.A_BOLD },
+        .dark2026  = .{ .fg = 111,             .bg = -1,             .attr = c.A_BOLD, .fallback = .{ .fg = c.COLOR_BLUE,  .bg = -1,            .attr = c.A_BOLD } },
+        .light2026 = .{ .fg = 24,              .bg = -1,             .attr = c.A_BOLD, .fallback = .{ .fg = c.COLOR_BLUE,  .bg = -1,            .attr = c.A_BOLD } } },
+    .{  .name      = "hd", // header + footer
+        .off       = .{ .fg = -1,              .bg = -1,             .attr = c.A_REVERSE },
+        .dark      = .{ .fg = c.COLOR_BLACK,   .bg = c.COLOR_CYAN,   .attr = 0 },
+        .darkbg    = .{ .fg = c.COLOR_BLACK,   .bg = c.COLOR_CYAN,   .attr = 0 },
+        .dark2026  = .{ .fg = 254,             .bg = 236,            .attr = 0,        .fallback = .{ .fg = c.COLOR_BLACK, .bg = c.COLOR_CYAN,  .attr = 0 } },
+        .light2026 = .{ .fg = 235,             .bg = 253,            .attr = 0,        .fallback = .{ .fg = -1,            .bg = -1,            .attr = c.A_REVERSE } } },
+    .{  .name      = "sel",
+        .off       = .{ .fg = -1,              .bg = -1,             .attr = c.A_REVERSE },
+        .dark      = .{ .fg = c.COLOR_WHITE,   .bg = c.COLOR_GREEN,  .attr = c.A_BOLD },
+        .darkbg    = .{ .fg = c.COLOR_WHITE,   .bg = c.COLOR_GREEN,  .attr = c.A_BOLD },
+        .dark2026  = .{ .fg = 255,             .bg = 23,             .attr = c.A_BOLD, .fallback = .{ .fg = c.COLOR_WHITE, .bg = c.COLOR_GREEN, .attr = c.A_BOLD } },
+        .light2026 = .{ .fg = 232,             .bg = 152,            .attr = c.A_BOLD, .fallback = .{ .fg = c.COLOR_BLACK, .bg = c.COLOR_CYAN,  .attr = c.A_BOLD } } },
+    .{  .name      = "num",
+        .off       = .{ .fg = -1,              .bg = -1,             .attr = 0 },
+        .dark      = .{ .fg = c.COLOR_YELLOW,  .bg = -1,             .attr = c.A_BOLD },
+        .darkbg    = .{ .fg = c.COLOR_YELLOW,  .bg = c.COLOR_BLACK,  .attr = c.A_BOLD },
+        .dark2026  = .{ .fg = 221,             .bg = -1,             .attr = c.A_BOLD, .fallback = .{ .fg = c.COLOR_YELLOW, .bg = -1,           .attr = c.A_BOLD } },
+        .light2026 = .{ .fg = 130,             .bg = -1,             .attr = c.A_BOLD, .fallback = .{ .fg = -1,            .bg = -1,            .attr = c.A_BOLD } } },
+    .{  .name      = "num_hd",
+        .off       = .{ .fg = -1,              .bg = -1,             .attr = c.A_REVERSE },
+        .dark      = .{ .fg = c.COLOR_YELLOW,  .bg = c.COLOR_CYAN,   .attr = c.A_BOLD },
+        .darkbg    = .{ .fg = c.COLOR_YELLOW,  .bg = c.COLOR_CYAN,   .attr = c.A_BOLD },
+        .dark2026  = .{ .fg = 221,             .bg = 236,            .attr = c.A_BOLD, .fallback = .{ .fg = c.COLOR_BLACK, .bg = c.COLOR_CYAN,  .attr = c.A_BOLD } },
+        .light2026 = .{ .fg = 130,             .bg = 253,            .attr = c.A_BOLD, .fallback = .{ .fg = -1,            .bg = -1,            .attr = c.A_BOLD|c.A_REVERSE } } },
+    .{  .name      = "num_sel",
+        .off       = .{ .fg = -1,              .bg = -1,             .attr = c.A_REVERSE },
+        .dark      = .{ .fg = c.COLOR_YELLOW,  .bg = c.COLOR_GREEN,  .attr = c.A_BOLD },
+        .darkbg    = .{ .fg = c.COLOR_YELLOW,  .bg = c.COLOR_GREEN,  .attr = c.A_BOLD },
+        .dark2026  = .{ .fg = 222,             .bg = 23,             .attr = c.A_BOLD, .fallback = .{ .fg = c.COLOR_WHITE, .bg = c.COLOR_GREEN, .attr = c.A_BOLD } },
+        .light2026 = .{ .fg = 94,              .bg = 152,            .attr = c.A_BOLD, .fallback = .{ .fg = c.COLOR_BLACK, .bg = c.COLOR_CYAN,  .attr = c.A_BOLD } } },
+    .{  .name      = "key",
+        .off       = .{ .fg = -1,              .bg = -1,             .attr = c.A_BOLD },
+        .dark      = .{ .fg = c.COLOR_YELLOW,  .bg = -1,             .attr = c.A_BOLD },
+        .darkbg    = .{ .fg = c.COLOR_YELLOW,  .bg = c.COLOR_BLACK,  .attr = c.A_BOLD },
+        .dark2026  = .{ .fg = 221,             .bg = -1,             .attr = c.A_BOLD, .fallback = .{ .fg = c.COLOR_YELLOW, .bg = -1,           .attr = c.A_BOLD } },
+        .light2026 = .{ .fg = 130,             .bg = -1,             .attr = c.A_BOLD, .fallback = .{ .fg = -1,            .bg = -1,            .attr = c.A_BOLD } } },
+    .{  .name      = "key_hd",
+        .off       = .{ .fg = -1,              .bg = -1,             .attr = c.A_BOLD|c.A_REVERSE },
+        .dark      = .{ .fg = c.COLOR_YELLOW,  .bg = c.COLOR_CYAN,   .attr = c.A_BOLD },
+        .darkbg    = .{ .fg = c.COLOR_YELLOW,  .bg = c.COLOR_CYAN,   .attr = c.A_BOLD },
+        .dark2026  = .{ .fg = 221,             .bg = 236,            .attr = c.A_BOLD, .fallback = .{ .fg = c.COLOR_BLACK, .bg = c.COLOR_CYAN,  .attr = c.A_BOLD } },
+        .light2026 = .{ .fg = 130,             .bg = 253,            .attr = c.A_BOLD, .fallback = .{ .fg = -1,            .bg = -1,            .attr = c.A_BOLD|c.A_REVERSE } } },
+    .{  .name      = "dir",
+        .off       = .{ .fg = -1,              .bg = -1,             .attr = 0 },
+        .dark      = .{ .fg = c.COLOR_BLUE,    .bg = -1,             .attr = c.A_BOLD },
+        .darkbg    = .{ .fg = c.COLOR_BLUE,    .bg = c.COLOR_BLACK,  .attr = c.A_BOLD },
+        .dark2026  = .{ .fg = 111,             .bg = -1,             .attr = c.A_BOLD, .fallback = .{ .fg = c.COLOR_BLUE,  .bg = -1,            .attr = c.A_BOLD } },
+        .light2026 = .{ .fg = 24,              .bg = -1,             .attr = c.A_BOLD, .fallback = .{ .fg = c.COLOR_BLUE,  .bg = -1,            .attr = c.A_BOLD } } },
+    .{  .name      = "dir_sel",
+        .off       = .{ .fg = -1,              .bg = -1,             .attr = c.A_REVERSE },
+        .dark      = .{ .fg = c.COLOR_BLUE,    .bg = c.COLOR_GREEN,  .attr = c.A_BOLD },
+        .darkbg    = .{ .fg = c.COLOR_BLUE,    .bg = c.COLOR_GREEN,  .attr = c.A_BOLD },
+        .dark2026  = .{ .fg = 153,             .bg = 23,             .attr = c.A_BOLD, .fallback = .{ .fg = c.COLOR_WHITE, .bg = c.COLOR_GREEN, .attr = c.A_BOLD } },
+        .light2026 = .{ .fg = 24,              .bg = 152,            .attr = c.A_BOLD, .fallback = .{ .fg = c.COLOR_BLACK, .bg = c.COLOR_CYAN,  .attr = c.A_BOLD } } },
+    .{  .name      = "flag",
+        .off       = .{ .fg = -1,              .bg = -1,             .attr = 0 },
+        .dark      = .{ .fg = c.COLOR_RED,     .bg = -1,             .attr = 0 },
+        .darkbg    = .{ .fg = c.COLOR_RED,     .bg = c.COLOR_BLACK,  .attr = 0 },
+        .dark2026  = .{ .fg = 203,             .bg = -1,             .attr = 0,        .fallback = .{ .fg = c.COLOR_RED,   .bg = -1,            .attr = 0 } },
+        .light2026 = .{ .fg = 160,             .bg = -1,             .attr = 0,        .fallback = .{ .fg = c.COLOR_RED,   .bg = -1,            .attr = 0 } } },
+    .{  .name      = "flag_sel",
+        .off       = .{ .fg = -1,              .bg = -1,             .attr = c.A_REVERSE },
+        .dark      = .{ .fg = c.COLOR_RED,     .bg = c.COLOR_GREEN,  .attr = 0 },
+        .darkbg    = .{ .fg = c.COLOR_RED,     .bg = c.COLOR_GREEN,  .attr = 0 },
+        .dark2026  = .{ .fg = 210,             .bg = 23,             .attr = c.A_BOLD, .fallback = .{ .fg = c.COLOR_WHITE, .bg = c.COLOR_GREEN, .attr = c.A_BOLD } },
+        .light2026 = .{ .fg = 124,             .bg = 152,            .attr = c.A_BOLD, .fallback = .{ .fg = c.COLOR_BLACK, .bg = c.COLOR_CYAN,  .attr = c.A_BOLD } } },
+    .{  .name      = "graph",
+        .off       = .{ .fg = -1,              .bg = -1,             .attr = 0 },
+        .dark      = .{ .fg = c.COLOR_MAGENTA, .bg = -1,             .attr = 0 },
+        .darkbg    = .{ .fg = c.COLOR_MAGENTA, .bg = c.COLOR_BLACK,  .attr = 0 },
+        .dark2026  = .{ .fg = 141,             .bg = -1,             .attr = 0,        .fallback = .{ .fg = c.COLOR_MAGENTA, .bg = -1,          .attr = 0 } },
+        .light2026 = .{ .fg = 90,              .bg = -1,             .attr = 0,        .fallback = .{ .fg = c.COLOR_MAGENTA, .bg = -1,          .attr = 0 } } },
+    .{  .name      = "graph_sel",
+        .off       = .{ .fg = -1,              .bg = -1,             .attr = c.A_REVERSE },
+        .dark      = .{ .fg = c.COLOR_MAGENTA, .bg = c.COLOR_GREEN,  .attr = 0 },
+        .darkbg    = .{ .fg = c.COLOR_MAGENTA, .bg = c.COLOR_GREEN,  .attr = 0 },
+        .dark2026  = .{ .fg = 183,             .bg = 23,             .attr = 0,        .fallback = .{ .fg = c.COLOR_WHITE, .bg = c.COLOR_GREEN, .attr = 0 } },
+        .light2026 = .{ .fg = 90,              .bg = 152,            .attr = 0,        .fallback = .{ .fg = c.COLOR_BLACK, .bg = c.COLOR_CYAN,  .attr = 0 } } },
 };
+
+comptime {
+    for (styles) |s| {
+        for (@typeInfo(@TypeOf(main.config.ui_color)).@"enum".field_names) |name| {
+            const a: StyleAttr = @field(s, name);
+            if ((a.fg > 7 or a.bg > 7) and a.fallback == null)
+                @compileError("256-color style '" ++ s.name ++ "." ++ name ++ "' must define a fallback");
+            if (a.fallback) |fb| {
+                if (fb.fg > 7 or fb.bg > 7)
+                    @compileError("Fallback for '" ++ s.name ++ "." ++ name ++ "' must use base 8 colors (-1..7)");
+            }
+        }
+    }
+}
+
+var style_attrs: [styles.len]u32 = undefined;
 
 pub const Style = lbl: {
     var names: [styles.len][]const u8 = undefined;
@@ -364,7 +429,12 @@ pub fn init() void {
 
     _ = c.start_color();
     _ = c.use_default_colors();
-    for (styles, 0..) |s, i| _ = c.init_pair(@as(i16, @intCast(i+1)), s.style().fg, s.style().bg);
+    const use_256 = c.COLORS >= 256;
+    for (styles, &style_attrs, 1..) |s, *attr, pair| {
+        const a = s.style().resolve(use_256);
+        _ = c.init_pair(@intCast(pair), a.fg, a.bg);
+        attr.* = a.attr;
+    }
     _ = c.bkgd(@intCast(c.COLOR_PAIR(@intFromEnum(Style.default)+1)));
     inited = true;
 }
@@ -381,7 +451,7 @@ pub fn deinit() void {
 }
 
 pub fn style(s: Style) void {
-    _ = c.attr_set(styles[@intFromEnum(s)].style().attr, @intFromEnum(s)+1, null);
+    _ = c.attr_set(style_attrs[@intFromEnum(s)], @intFromEnum(s)+1, null);
 }
 
 pub fn move(y: u32, x: u32) void {
