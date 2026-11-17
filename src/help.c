@@ -157,7 +157,7 @@ void help_draw(void) {
       ncaddstr(y+2, x+30, "Usage");
       ncprint( y+4, x+30, "%s", PACKAGE_VERSION);
       ncaddstr( 9, 11, "Written by Yorhel <projects@yorhel.nl>");
-      ncaddstr(10, 16, "https://dev.yorhel.nl/ncdu/");
+      ncaddstr(10, 15, "https://ncdu.landless-city.net");
       break;
   }
 }
