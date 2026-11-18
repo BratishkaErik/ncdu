@@ -1,4 +1,4 @@
-# ncdu 1.23.0
+# ncdu 1.24.0
 
 > [!IMPORTANT]
 > **This is a Maintenance Fork!**
