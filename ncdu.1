@@ -182,8 +182,10 @@ The exact counting behavior of this flag is subject to change in the future.
 The complete list of currently known pseudo filesystems is: binfmt, bpf, cgroup,
 cgroup2, debug, devpts, proc, pstore, security, selinux, sys, trace.
 .It Fl t , \-threads Ar num
-Number of threads to use when scanning the filesystem, defaults to 1.
+Number of threads to use when scanning the filesystem.
 A value of 0 automatically uses the number of CPU cores, capped at 16.
+The default is 0, or 1 when exporting to JSON with
+.Fl o .
 .Pp
 In single-threaded mode, the JSON export (see
 .Fl o )
@@ -192,6 +194,9 @@ directory tree is first constructed in memory and written out after the
 filesystem scan has completed,
 This causes a delay in output and requires significantly more memory for large
 directory trees.
+For this reason, JSON export defaults to 1 thread unless
+.Fl t
+is explicitly given.
 The binary format (see
 .Fl O )
 does not have this problem and supports efficient exporting with any number of

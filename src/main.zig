@@ -86,7 +86,7 @@ pub const config = struct {
     pub var follow_symlinks: bool = false;
     pub var exclude_caches: bool = false;
     pub var exclude_kernfs: bool = false;
-    pub var threads: usize = 1;
+    pub var threads: usize = 0;
     pub var complevel: u8 = 4;
     pub var compress: bool = false;
     pub var export_block_size: ?usize = null;
@@ -211,6 +211,8 @@ const Args = struct {
     }
 };
 
+var threads_set: bool = false;
+
 fn argConfig(args: *Args, opt: Args.Option, infile: bool) !void {
     if (opt.is("-q") or opt.is("--slow-ui-updates")) config.update_delay = 2*std.time.ns_per_s
     else if (opt.is("--fast-ui-updates")) config.update_delay = 100*std.time.ns_per_ms
@@ -327,6 +329,7 @@ fn argConfig(args: *Args, opt: Args.Option, infile: bool) !void {
     } else if (opt.is("-t") or opt.is("--threads")) {
         const val = try args.arg();
         config.threads = std.fmt.parseInt(u8, val, 10) catch try args.die("Invalid number of --threads: {s}.\n", .{val});
+        threads_set = true;
     } else return error.UnknownOption;
 }
 
@@ -558,6 +561,7 @@ pub fn main(init: std.process.Init.Minimal) void {
         }
     }
 
+    if (!threads_set and export_json != null) config.threads = 1;
     if (config.threads == 0) config.threads = @min(std.Thread.getCpuCount() catch 1, 16);
 
     if (@import("builtin").os.tag != .linux and config.exclude_kernfs)
