@@ -54,7 +54,7 @@ jobs:
 
   build-binaries:
     name: Build static binaries (${{ matrix.target }})
-    runs-on: ubuntu-26.04
+    runs-on: ${{ matrix.os || 'ubuntu-26.04' }}
     permissions:
       contents: read
     strategy:
@@ -79,6 +79,10 @@ jobs:
             binutils: binutils-arm-linux-gnueabi
             strip_prefix: arm-linux-gnueabi-
 
+          - target: aarch64-macos
+            arch_suffix: macos-aarch64
+            os: macos-26
+
     steps:
       - name: Checkout
         uses: actions/checkout@v7.0.1
@@ -98,11 +102,13 @@ jobs:
             --build-id=fast --prefix current-build
 
       - name: Install strip
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y ${{ matrix.binutils }}
 
       - name: Strip debug symbols
+        if: runner.os == 'Linux'
         run: ${{ matrix.strip_prefix }}strip -R .eh_frame -R .eh_frame_hdr current-build/bin/ncdu
 
       - name: Package binary
