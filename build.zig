@@ -192,8 +192,17 @@ fn buildNcurses(
         "--enable-widec",
         "--with-default-terminfo-dir=/usr/share/terminfo",
         "--with-terminfo-dirs=/usr/share/terminfo:/lib/terminfo:/usr/local/share/terminfo",
-        "--with-fallbacks=screen linux vt100 xterm xterm-256color",
     });
+
+    if (!target.os.tag.isDarwin()) {
+        // Apple's system tic (ncurses 5.7) cannot compile ncurses 6.5's terminfo.src for fallbacks.
+        run_config.addArg("--with-fallbacks=screen linux vt100 xterm xterm-256color");
+    }
+
+    if (target.os.tag.isDarwin()) {
+        // Avoid legacy short-ospeed compat path that unconditionally includes <sys/ttydev.h> on Darwin.
+        run_config.addArg("--with-ospeed=int");
+    }
 
     // Set info for cross-compilation itself
     run_config.addArgs(&.{

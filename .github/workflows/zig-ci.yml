@@ -28,12 +28,6 @@ jobs:
       matrix:
         os: [ ubuntu-26.04, ubuntu-26.04-arm, macos-26 ]
         sys-libs: [ true, false ]
-        exclude:
-          # Exclude macOS when using fetched libraries:
-          # TODO FIX: ncurses configure complain about:
-          # ../ncurses/tinfo/lib_baudrate.c:82:10: fatal error: 'sys/ttydev.h' file not found
-          - os: macos-26
-            sys-libs: false
 
     steps:
       - name: Checkout
