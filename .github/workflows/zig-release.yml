@@ -111,6 +111,12 @@ jobs:
         if: runner.os == 'Linux'
         run: ${{ matrix.strip_prefix }}strip -R .eh_frame -R .eh_frame_hdr current-build/bin/ncdu
 
+      - name: Install GNU tar
+        if: runner.os == 'macOS'
+        run: |
+          brew install gnu-tar
+          echo "$(brew --prefix gnu-tar)/libexec/gnubin" >> $GITHUB_PATH
+
       - name: Package binary
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
