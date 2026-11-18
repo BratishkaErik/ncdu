@@ -13,8 +13,8 @@
     .version = "2.12.1",
     .dependencies = .{
         .translate_c = .{
-            .url = "https://codeberg.org/ziglang/translate-c/archive/2.0.0.tar.gz",
-            .hash = "translate_c-2.0.0-Q_BUWltOBwA0229IE8wwSxxGzOxyRso3hvcb1nN8oJX_",
+            .url = "https://codeberg.org/ziglang/translate-c/archive/2.0.2.tar.gz",
+            .hash = "translate_c-2.0.2-Q_BUWvBNBwBgPKQJPblip6M7AHNK_IPNPmyv4rSIQMQc",
         },
         .zstd = .{
             .url = "https://github.com/allyourcodebase/zstd/archive/refs/tags/1.5.7-2.tar.gz",
